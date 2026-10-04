@@ -71,7 +71,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1244027476;
+  int get rustContentHash => -875919898;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -107,6 +107,11 @@ abstract class RustLibApi extends BaseApi {
     required String deviceId,
     required String accessToken,
     String? refreshToken,
+  });
+
+  Future<void> crateApiRoomsSendMessage({
+    required String roomId,
+    required String message,
   });
 }
 
@@ -334,6 +339,40 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           "refreshToken",
         ],
       );
+
+  @override
+  Future<void> crateApiRoomsSendMessage({
+    required String roomId,
+    required String message,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(roomId, serializer);
+          sse_encode_String(message, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 8,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiRoomsSendMessageConstMeta,
+        argValues: [roomId, message],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiRoomsSendMessageConstMeta => const TaskConstMeta(
+    debugName: "send_message",
+    argNames: ["roomId", "message"],
+  );
 
   @protected
   String dco_decode_String(dynamic raw) {

@@ -23,4 +23,9 @@ class MessagesRepositoryImpl implements MessagesRepository {
         )
         .toList();
   }
+
+  @override
+  Future<void> sendMessage({required String roomId, required String message}) {
+    return rust_api.sendMessage(roomId: roomId, message: message);
+  }
 }

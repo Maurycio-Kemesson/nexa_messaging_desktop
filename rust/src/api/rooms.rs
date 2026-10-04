@@ -4,7 +4,10 @@ use matrix_sdk::{
         events::{
             AnySyncMessageLikeEvent,
             AnySyncTimelineEvent,
-            room::message::MessageType,
+            room::message::{
+                MessageType,
+                RoomMessageEventContent,
+            },
         },
     },
     room::MessagesOptions,
@@ -109,4 +112,27 @@ pub async fn get_messages(room_id: String) -> Result<Vec<MessageSummary>, String
     messages.sort_by_key(|message| message.timestamp);
 
     Ok(messages)
+}
+
+#[flutter_rust_bridge::frb]
+pub async fn send_message(
+    room_id: String,
+    message: String,
+) -> Result<(), String> {
+    let client = get_authenticated_client()?;
+
+    let room_id = RoomId::parse(&room_id)
+        .map_err(|error| error.to_string())?;
+
+    let room = client
+        .get_room(&room_id)
+        .ok_or_else(|| "Room not found".to_string())?;
+
+    let content = RoomMessageEventContent::text_plain(message);
+
+    room.send(content)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    Ok(())
 }

@@ -9,4 +9,8 @@ class MessagesUseCase {
   Future<List<MessageEntity>> call({required String roomId}) {
     return _repository.getMessages(roomId: roomId);
   }
+
+  Future<void> sendMessage({required String roomId, required String message}) {
+    return _repository.sendMessage(roomId: roomId, message: message);
+  }
 }

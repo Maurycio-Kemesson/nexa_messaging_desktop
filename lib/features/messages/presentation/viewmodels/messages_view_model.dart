@@ -30,4 +30,30 @@ class MessagesViewModel extends Notifier<MessagesState> {
       state = state.copyWith(isLoading: false, error: error.toString());
     }
   }
+
+  Future<void> sendMessage({
+    required String roomId,
+    required String message,
+  }) async {
+    final trimmedMessage = message.trim();
+
+    if (trimmedMessage.isEmpty) {
+      return;
+    }
+
+    state = state.copyWith(isSending: true, error: null);
+
+    try {
+      await _messagesUseCase.sendMessage(
+        roomId: roomId,
+        message: trimmedMessage,
+      );
+
+      await loadMessages(roomId: roomId);
+
+      state = state.copyWith(isSending: false);
+    } catch (error) {
+      state = state.copyWith(isSending: false, error: error.toString());
+    }
+  }
 }
