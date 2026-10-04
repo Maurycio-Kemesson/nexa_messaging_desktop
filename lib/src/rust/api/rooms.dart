@@ -7,10 +7,41 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 import '../frb_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `fmt`, `fmt`
 
 Future<List<RoomSummary>> getRooms() =>
     RustLib.instance.api.crateApiRoomsGetRooms();
+
+Future<List<MessageSummary>> getMessages({required String roomId}) =>
+    RustLib.instance.api.crateApiRoomsGetMessages(roomId: roomId);
+
+class MessageSummary {
+  final String id;
+  final String sender;
+  final String content;
+  final PlatformInt64 timestamp;
+
+  const MessageSummary({
+    required this.id,
+    required this.sender,
+    required this.content,
+    required this.timestamp,
+  });
+
+  @override
+  int get hashCode =>
+      id.hashCode ^ sender.hashCode ^ content.hashCode ^ timestamp.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MessageSummary &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          sender == other.sender &&
+          content == other.content &&
+          timestamp == other.timestamp;
+}
 
 class RoomSummary {
   final String id;

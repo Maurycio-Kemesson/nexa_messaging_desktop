@@ -32,10 +32,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AuthSession dco_decode_auth_session(dynamic raw);
 
   @protected
+  PlatformInt64 dco_decode_i_64(dynamic raw);
+
+  @protected
+  List<MessageSummary> dco_decode_list_message_summary(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
   List<RoomSummary> dco_decode_list_room_summary(dynamic raw);
+
+  @protected
+  MessageSummary dco_decode_message_summary(dynamic raw);
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
@@ -56,10 +65,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AuthSession sse_decode_auth_session(SseDeserializer deserializer);
 
   @protected
+  PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
+
+  @protected
+  List<MessageSummary> sse_decode_list_message_summary(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
   List<RoomSummary> sse_decode_list_room_summary(SseDeserializer deserializer);
+
+  @protected
+  MessageSummary sse_decode_message_summary(SseDeserializer deserializer);
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
@@ -86,6 +106,15 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_auth_session(AuthSession self, SseSerializer serializer);
 
   @protected
+  void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_message_summary(
+    List<MessageSummary> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
     SseSerializer serializer,
@@ -94,6 +123,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_list_room_summary(
     List<RoomSummary> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_message_summary(
+    MessageSummary self,
     SseSerializer serializer,
   );
 
