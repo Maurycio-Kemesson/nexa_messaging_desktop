@@ -10,6 +10,7 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 import 'api/client.dart';
 import 'api/matrix.dart';
+import 'api/rooms.dart';
 import 'api/simple.dart';
 import 'frb_generated.dart';
 import 'frb_generated.io.dart'
@@ -70,7 +71,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.13.0';
 
   @override
-  int get rustContentHash => 1470957090;
+  int get rustContentHash => 1145945400;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -84,6 +85,8 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 abstract class RustLibApi extends BaseApi {
   Future<String> crateApiClientConnectMatrix();
 
+  Future<List<RoomSummary>> crateApiRoomsGetRooms();
+
   String crateApiSimpleGreet({required String name});
 
   Future<void> crateApiSimpleInitApp();
@@ -92,6 +95,14 @@ abstract class RustLibApi extends BaseApi {
     required String homeserver,
     required String username,
     required String password,
+  });
+
+  Future<void> crateApiClientRestoreMatrixSession({
+    required String homeserver,
+    required String userId,
+    required String deviceId,
+    required String accessToken,
+    String? refreshToken,
   });
 }
 
@@ -131,13 +142,40 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "connect_matrix", argNames: []);
 
   @override
+  Future<List<RoomSummary>> crateApiRoomsGetRooms() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 2,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_list_room_summary,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiRoomsGetRoomsConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiRoomsGetRoomsConstMeta =>
+      const TaskConstMeta(debugName: "get_rooms", argNames: []);
+
+  @override
   String crateApiSimpleGreet({required String name}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(name, serializer);
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 2)!;
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3)!;
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_String,
@@ -162,7 +200,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 3,
+            funcId: 4,
             port: port_,
           );
         },
@@ -196,7 +234,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 4,
+            funcId: 5,
             port: port_,
           );
         },
@@ -215,6 +253,53 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     debugName: "login_matrix",
     argNames: ["homeserver", "username", "password"],
   );
+
+  @override
+  Future<void> crateApiClientRestoreMatrixSession({
+    required String homeserver,
+    required String userId,
+    required String deviceId,
+    required String accessToken,
+    String? refreshToken,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(homeserver, serializer);
+          sse_encode_String(userId, serializer);
+          sse_encode_String(deviceId, serializer);
+          sse_encode_String(accessToken, serializer);
+          sse_encode_opt_String(refreshToken, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 6,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_unit,
+          decodeErrorData: sse_decode_String,
+        ),
+        constMeta: kCrateApiClientRestoreMatrixSessionConstMeta,
+        argValues: [homeserver, userId, deviceId, accessToken, refreshToken],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiClientRestoreMatrixSessionConstMeta =>
+      const TaskConstMeta(
+        debugName: "restore_matrix_session",
+        argNames: [
+          "homeserver",
+          "userId",
+          "deviceId",
+          "accessToken",
+          "refreshToken",
+        ],
+      );
 
   @protected
   String dco_decode_String(dynamic raw) {
@@ -243,9 +328,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<RoomSummary> dco_decode_list_room_summary(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_room_summary).toList();
+  }
+
+  @protected
   String? dco_decode_opt_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_String(raw);
+  }
+
+  @protected
+  RoomSummary dco_decode_room_summary(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2)
+      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return RoomSummary(
+      id: dco_decode_String(arr[0]),
+      name: dco_decode_String(arr[1]),
+    );
   }
 
   @protected
@@ -290,6 +393,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<RoomSummary> sse_decode_list_room_summary(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    final len_ = sse_decode_i_32(deserializer);
+    final ans_ = <RoomSummary>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_room_summary(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   String? sse_decode_opt_String(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -298,6 +413,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     } else {
       return null;
     }
+  }
+
+  @protected
+  RoomSummary sse_decode_room_summary(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    final var_id = sse_decode_String(deserializer);
+    final var_name = sse_decode_String(deserializer);
+    return RoomSummary(id: var_id, name: var_name);
   }
 
   @protected
@@ -349,6 +472,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_room_summary(
+    List<RoomSummary> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_room_summary(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -356,6 +491,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     if (self != null) {
       sse_encode_String(self, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_room_summary(RoomSummary self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.id, serializer);
+    sse_encode_String(self.name, serializer);
   }
 
   @protected
