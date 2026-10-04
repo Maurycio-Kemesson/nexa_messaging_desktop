@@ -10,24 +10,32 @@ class RustTestContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(rustTestViewModelProvider);
 
+    final viewModel = ref.read(rustTestViewModelProvider.notifier);
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          state.message.isEmpty ? 'Clique para testar o Rust' : state.message,
+          state.message.isEmpty ? 'Teste a integração' : state.message,
+          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
         ElevatedButton(
-          onPressed: state.isLoading
-              ? null
-              : () {
-                  ref.read(rustTestViewModelProvider.notifier).greet();
-                },
+          onPressed: state.isLoading ? null : viewModel.greet,
           child: const Text('Testar Rust'),
+        ),
+        const SizedBox(height: 12),
+        ElevatedButton(
+          onPressed: state.isLoading ? null : viewModel.connectMatrix,
+          child: Text(state.isLoading ? 'Conectando...' : 'Testar Matrix'),
         ),
         if (state.error != null) ...[
           const SizedBox(height: 16),
-          Text(state.error!, style: const TextStyle(color: Colors.red)),
+          Text(
+            state.error!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.red),
+          ),
         ],
       ],
     );
