@@ -15,6 +15,12 @@ Future<List<RoomSummary>> getRooms() =>
 Future<List<MessageSummary>> getMessages({required String roomId}) =>
     RustLib.instance.api.crateApiRoomsGetMessages(roomId: roomId);
 
+Future<void> sendMessage({required String roomId, required String message}) =>
+    RustLib.instance.api.crateApiRoomsSendMessage(
+      roomId: roomId,
+      message: message,
+    );
+
 class MessageSummary {
   final String id;
   final String sender;
