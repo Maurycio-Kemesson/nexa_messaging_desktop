@@ -11,6 +11,7 @@ import 'dart:convert';
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_web.dart';
 
+import 'api/client.dart';
 import 'api/simple.dart';
 import 'frb_generated.dart';
 

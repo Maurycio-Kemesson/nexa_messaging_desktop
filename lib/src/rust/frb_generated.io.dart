@@ -9,6 +9,7 @@ import 'dart:ffi' as ffi;
 
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 
+import 'api/client.dart';
 import 'api/simple.dart';
 import 'frb_generated.dart';
 
