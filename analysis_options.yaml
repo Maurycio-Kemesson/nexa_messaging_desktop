@@ -10,6 +10,7 @@ analyzer:
     - "lib/generated/**"
     - "tool/mason/**"
 
+    - rust_builder/cargokit/**
 linter:
   rules:
     always_declare_return_types: true
