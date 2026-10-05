@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nexa_messaging_desktop/features/recovery/presentation/views/recovery_view.dart';
 
 import '../../features/auth/presentation/viewmodels/auth_view_model.dart';
 import '../../features/auth/presentation/views/auth_view.dart';
@@ -54,13 +55,16 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((ref) {
         name: AppRoutes.authentication,
         builder: (context, state) => const AuthView(),
       ),
-
       GoRoute(
         path: AppRoutes.homePath,
         name: AppRoutes.home,
         builder: (context, state) => const HomeView(),
       ),
-
+      GoRoute(
+        path: AppRoutes.recoveryPath,
+        name: AppRoutes.recovery,
+        builder: (context, state) => const RecoveryView(),
+      ),
       GoRoute(
         path: AppRoutes.rustTestPath,
         name: AppRoutes.rustTest,

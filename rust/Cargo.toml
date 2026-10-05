@@ -7,7 +7,9 @@ edition = "2021"
 crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
+dirs = "7.0.0"
 flutter_rust_bridge = "=2.13.0"
+futures-util = "0.3.34"
 matrix-sdk = { version = "0.19.1", features = ["bundled-sqlite"] }
 tokio = { version = "1.53.2", features = ["macros", "rt-multi-thread"] }
 

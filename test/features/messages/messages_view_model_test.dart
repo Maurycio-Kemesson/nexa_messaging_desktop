@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:nexa_messaging_desktop/features/messages/domain/entities/messages_entity.dart';
+import 'package:nexa_messaging_desktop/features/messages/domain/entities/messages_page_entity.dart';
 import 'package:nexa_messaging_desktop/features/messages/domain/repositories/messages_repository.dart';
 import 'package:nexa_messaging_desktop/features/messages/presentation/messages_providers.dart';
 import 'package:nexa_messaging_desktop/features/messages/presentation/viewmodels/messages_view_model.dart';
@@ -19,9 +20,13 @@ class FakeMessagesRepository implements MessagesRepository {
   Completer<void>? sendCompleter;
 
   @override
-  Future<List<MessageEntity>> getMessages({required String roomId}) async {
+  Future<MessagesPageEntity> getMessages({
+    required String roomId,
+    String? fromToken,
+  }) async {
     getMessagesCalled = true;
-    return [];
+
+    return const MessagesPageEntity(messages: [], endToken: null);
   }
 
   @override
@@ -40,6 +45,11 @@ class FakeMessagesRepository implements MessagesRepository {
     if (sendCompleter != null) {
       await sendCompleter!.future;
     }
+  }
+
+  @override
+  Stream<MessageEntity> watchMessages() {
+    return const Stream.empty();
   }
 }
 
@@ -147,7 +157,6 @@ void main() {
     );
 
     expect(repository.sendMessageCalled, isTrue);
-
     expect(repository.getMessagesCalled, isTrue);
   });
 }

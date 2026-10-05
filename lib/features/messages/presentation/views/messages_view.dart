@@ -22,11 +22,11 @@ class _MessagesViewState extends ConsumerState<MessagesView> {
   void initState() {
     super.initState();
 
-    Future.microtask(
-      () => ref
+    Future.microtask(() {
+      ref
           .read(messagesViewModelProvider.notifier)
-          .loadMessages(roomId: widget.roomId),
-    );
+          .loadMessages(roomId: widget.roomId);
+    });
   }
 
   @override
