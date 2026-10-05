@@ -8,7 +8,8 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import '../frb_generated.dart';
 import 'matrix.dart';
 
-// These functions are ignored because they are not marked as `pub`: `get_authenticated_client`, `matrix_client`
+// These functions are ignored because they are not marked as `pub`: `get_authenticated_client`, `matrix_client`, `matrix_store_path`
+// These functions are ignored (category: IgnoreBecauseExplicitAttribute): `matrix_message_sender`, `subscribe_to_matrix_messages`
 
 Future<String> connectMatrix() =>
     RustLib.instance.api.crateApiClientConnectMatrix();
@@ -36,3 +37,14 @@ Future<void> restoreMatrixSession({
   accessToken: accessToken,
   refreshToken: refreshToken,
 );
+
+Future<void> startMatrixSync() =>
+    RustLib.instance.api.crateApiClientStartMatrixSync();
+
+Future<String> checkMatrixBackup() =>
+    RustLib.instance.api.crateApiClientCheckMatrixBackup();
+
+Future<void> recoverMatrixEncryption({required String recoveryKey}) => RustLib
+    .instance
+    .api
+    .crateApiClientRecoverMatrixEncryption(recoveryKey: recoveryKey);

@@ -7,13 +7,16 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 import '../frb_generated.dart';
 
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`
 
 Future<List<RoomSummary>> getRooms() =>
     RustLib.instance.api.crateApiRoomsGetRooms();
 
-Future<List<MessageSummary>> getMessages({required String roomId}) =>
-    RustLib.instance.api.crateApiRoomsGetMessages(roomId: roomId);
+Future<MessagesPage> getMessages({required String roomId, String? fromToken}) =>
+    RustLib.instance.api.crateApiRoomsGetMessages(
+      roomId: roomId,
+      fromToken: fromToken,
+    );
 
 Future<void> sendMessage({required String roomId, required String message}) =>
     RustLib.instance.api.crateApiRoomsSendMessage(
@@ -21,14 +24,19 @@ Future<void> sendMessage({required String roomId, required String message}) =>
       message: message,
     );
 
+Stream<MessageSummary> subscribeToMessages() =>
+    RustLib.instance.api.crateApiRoomsSubscribeToMessages();
+
 class MessageSummary {
   final String id;
+  final String roomId;
   final String sender;
   final String content;
   final PlatformInt64 timestamp;
 
   const MessageSummary({
     required this.id,
+    required this.roomId,
     required this.sender,
     required this.content,
     required this.timestamp,
@@ -36,7 +44,11 @@ class MessageSummary {
 
   @override
   int get hashCode =>
-      id.hashCode ^ sender.hashCode ^ content.hashCode ^ timestamp.hashCode;
+      id.hashCode ^
+      roomId.hashCode ^
+      sender.hashCode ^
+      content.hashCode ^
+      timestamp.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -44,9 +56,28 @@ class MessageSummary {
       other is MessageSummary &&
           runtimeType == other.runtimeType &&
           id == other.id &&
+          roomId == other.roomId &&
           sender == other.sender &&
           content == other.content &&
           timestamp == other.timestamp;
+}
+
+class MessagesPage {
+  final List<MessageSummary> messages;
+  final String? endToken;
+
+  const MessagesPage({required this.messages, this.endToken});
+
+  @override
+  int get hashCode => messages.hashCode ^ endToken.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MessagesPage &&
+          runtimeType == other.runtimeType &&
+          messages == other.messages &&
+          endToken == other.endToken;
 }
 
 class RoomSummary {
