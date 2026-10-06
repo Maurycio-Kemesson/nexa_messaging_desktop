@@ -33,7 +33,9 @@ O **Nexa** é um cliente de mensageria desktop desenvolvido como parte de um des
 
 ## Capturas de tela
 
-Login no homeserver, lista de conversas, histórico de mensagens e recuperação das chaves E2EE.
+[Assista à demonstração no Windows 1.0.1](assets/captures/nexa-messaging-1.0.1-windows-x64.mp4)
+
+A gravação percorre o login, a lista de conversas, o envio de mensagens e a recuperação das chaves E2EE. No GitHub, o vídeo abre no próprio visualizador do arquivo.
 
 ![Login no homeserver Matrix](assets/captures/login.png)
 
