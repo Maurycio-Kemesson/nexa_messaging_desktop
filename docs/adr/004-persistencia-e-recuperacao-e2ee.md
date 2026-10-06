@@ -199,18 +199,12 @@ pub async fn recover_matrix_encryption(
 ) -> Result<(), String> {
     let client = get_authenticated_client()?;
 
-    println!("NEXA: iniciando recuperação E2EE...");
-
     client
         .encryption()
         .recovery()
         .recover(&recovery_key)
         .await
-        .map_err(|error| error.to_string())?;
-
-    println!("NEXA: recuperação E2EE concluída");
-
-    Ok(())
+        .map_err(|error| error.to_string())
 }
 ```
 

@@ -1,6 +1,6 @@
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../domain/entities/auth_session_entity.dart';
 import '../../domain/usecases/auth_usecase.dart';
 import '../auth_providers.dart';
 import 'auth_state.dart';
@@ -15,13 +15,15 @@ final isAuthenticatedProvider = Provider<bool>((ref) {
   return authState.session != null;
 });
 
+final currentSessionProvider = Provider<AuthSessionEntity?>((ref) {
+  return ref.watch(authViewModelProvider.select((state) => state.session));
+});
+
 class AuthViewModel extends Notifier<AuthState> {
-  late final AuthUseCase _authUseCase;
+  AuthUseCase get _authUseCase => ref.read(authUseCaseProvider);
 
   @override
   AuthState build() {
-    _authUseCase = ref.read(authUseCaseProvider);
-
     Future.microtask(_restoreSession);
 
     return const AuthState();
@@ -48,25 +50,17 @@ class AuthViewModel extends Notifier<AuthState> {
   }
 
   Future<void> _restoreSession() async {
-    debugPrint('AUTH: iniciando restauração da sessão');
-
     state = state.copyWith(isLoading: true, error: null);
 
     try {
       final session = await _authUseCase.getSession();
-
-      debugPrint('AUTH: sessão encontrada? ${session != null}');
 
       state = state.copyWith(
         isLoading: false,
         isInitialized: true,
         session: session,
       );
-
-      debugPrint('AUTH: estado inicializado: ${state.isInitialized}');
     } catch (error) {
-      debugPrint('AUTH: erro ao restaurar sessão: $error');
-
       state = state.copyWith(
         isLoading: false,
         isInitialized: true,
@@ -75,6 +69,8 @@ class AuthViewModel extends Notifier<AuthState> {
     }
   }
 
+  /// A sessão local é sempre encerrada. Uma falha ao revogar a sessão no
+  /// homeserver é exposta em [AuthState.error].
   Future<void> logout() async {
     state = state.copyWith(isLoading: true, error: null);
 
@@ -83,7 +79,11 @@ class AuthViewModel extends Notifier<AuthState> {
 
       state = state.copyWith(isLoading: false, session: null);
     } catch (error) {
-      state = state.copyWith(isLoading: false, error: error.toString());
+      state = state.copyWith(
+        isLoading: false,
+        session: null,
+        error: error.toString(),
+      );
     }
   }
 }

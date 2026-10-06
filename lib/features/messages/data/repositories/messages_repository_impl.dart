@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:nexa_messaging_desktop/features/messages/domain/entities/messages_page_entity.dart';
 import 'package:nexa_messaging_desktop/src/rust/api/rooms.dart' as rust_api;
 
@@ -18,8 +17,6 @@ class MessagesRepositoryImpl implements MessagesRepository {
       fromToken: fromToken,
     );
 
-    debugPrint('REPOSITORY: page.messages=${page.messages.length}');
-
     final messages = page.messages
         .map(
           (message) => MessageEntity(
@@ -31,8 +28,6 @@ class MessagesRepositoryImpl implements MessagesRepository {
           ),
         )
         .toList();
-
-    debugPrint('REPOSITORY: mensagens convertidas=${messages.length}');
 
     return MessagesPageEntity(messages: messages, endToken: page.endToken);
   }

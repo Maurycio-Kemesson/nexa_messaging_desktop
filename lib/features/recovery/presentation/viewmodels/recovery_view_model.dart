@@ -5,12 +5,10 @@ import '../recovery_providers.dart';
 import 'recovery_state.dart';
 
 class RecoveryViewModel extends Notifier<RecoveryState> {
-  late final RecoveryUseCase _recoveryUseCase;
+  RecoveryUseCase get _recoveryUseCase => ref.read(recoveryUseCaseProvider);
 
   @override
   RecoveryState build() {
-    _recoveryUseCase = ref.read(recoveryUseCaseProvider);
-
     return const RecoveryState();
   }
 

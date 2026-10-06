@@ -23,11 +23,11 @@ O FRB gera o código de FFI e serialização a partir das assinaturas Rust, com 
 
 ### API Rust pequena e orientada a casos de uso
 
-O Rust expõe funções de alto nível (`login_matrix`, `get_rooms`, `get_messages`, `send_message`, `subscribe_to_messages`) em vez de expor os objetos do SDK. Os tipos trocados são DTOs simples (`RoomSummary`, `MessageSummary`, `MessagesPage`). Assim, mudanças na API do `matrix-sdk` ficam contidas no Rust, e o Flutter não precisa lidar com handles opacos de objetos Rust.
+O Rust expõe funções de alto nível (`login_matrix`, `restore_matrix_session`, `logout_matrix`, `get_rooms`, `get_messages`, `send_message`, `subscribe_to_messages`) em vez de expor os objetos do SDK. Os tipos trocados são DTOs simples (`RoomSummary`, `MessageSummary`, `MessagesPage`). Assim, mudanças na API do `matrix-sdk` ficam contidas no Rust, e o Flutter não precisa lidar com handles opacos de objetos Rust.
 
 ### Cliente Matrix único e global no Rust
 
-O `Client` autenticado fica em um `OnceLock<Mutex<Option<Client>>>`. O Flutter não precisa guardar nem repassar referências ao cliente: cada função obtém o cliente com `get_authenticated_client()`. A consequência é que o processo suporta uma única conta por vez (ver [Limitações](limitacoes.md#uma-conta-por-processo)).
+O `Client` autenticado fica em um `OnceLock<Mutex<Option<Client>>>`. O Flutter não precisa guardar nem repassar referências ao cliente: cada função obtém o cliente com `get_authenticated_client()`. A consequência é que o processo suporta uma única conta por vez (ver [Limitações](limitacoes.md#uma-conta-por-vez)).
 
 ### Sync em thread dedicada e broadcast para o Flutter
 

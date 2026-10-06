@@ -8,11 +8,9 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import '../frb_generated.dart';
 import 'matrix.dart';
 
-// These functions are ignored because they are not marked as `pub`: `get_authenticated_client`, `matrix_client`, `matrix_store_path`
+// These functions are ignored because they are not marked as `pub`: `build_client`, `get_authenticated_client`, `matrix_client`, `matrix_store_path`, `matrix_sync`, `stop_matrix_sync`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `SyncHandle`
 // These functions are ignored (category: IgnoreBecauseExplicitAttribute): `matrix_message_sender`, `subscribe_to_matrix_messages`
-
-Future<String> connectMatrix() =>
-    RustLib.instance.api.crateApiClientConnectMatrix();
 
 Future<AuthSession> loginMatrix({
   required String homeserver,
@@ -41,8 +39,12 @@ Future<void> restoreMatrixSession({
 Future<void> startMatrixSync() =>
     RustLib.instance.api.crateApiClientStartMatrixSync();
 
-Future<String> checkMatrixBackup() =>
-    RustLib.instance.api.crateApiClientCheckMatrixBackup();
+/// Encerra a sessão no homeserver, para o sync e apaga o store local.
+///
+/// O estado local é sempre limpo, mesmo que o homeserver esteja inacessível.
+/// Nesse caso o erro do servidor é devolvido depois da limpeza.
+Future<void> logoutMatrix() =>
+    RustLib.instance.api.crateApiClientLogoutMatrix();
 
 Future<void> recoverMatrixEncryption({required String recoveryKey}) => RustLib
     .instance

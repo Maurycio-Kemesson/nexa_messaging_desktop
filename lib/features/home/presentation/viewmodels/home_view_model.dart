@@ -4,43 +4,27 @@ import '../../domain/usecases/home_usecase.dart';
 import '../home_providers.dart';
 import 'home_state.dart';
 
-final homeViewModelProvider =
-    NotifierProvider<
-        HomeViewModel,
-        HomeState>(
+final homeViewModelProvider = NotifierProvider<HomeViewModel, HomeState>(
   HomeViewModel.new,
 );
 
-class HomeViewModel
-    extends Notifier<HomeState> {
-  late final HomeUseCase _useCase;
+class HomeViewModel extends Notifier<HomeState> {
+  HomeUseCase get _useCase => ref.read(homeUseCaseProvider);
 
   @override
   HomeState build() {
-    _useCase = ref.read(
-      homeUseCaseProvider,
-    );
-
     return const HomeState();
   }
 
   Future<void> execute() async {
-    state = state.copyWith(
-      isLoading: true,
-      error: null,
-    );
+    state = state.copyWith(isLoading: true, error: null);
 
     try {
       await _useCase();
 
-      state = state.copyWith(
-        isLoading: false,
-      );
+      state = state.copyWith(isLoading: false);
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 }

@@ -96,10 +96,7 @@ A Recovery Key é usada somente nessa operação e não é armazenada. O raciona
 
 Para começar do zero (por exemplo, ao trocar de conta ou após um estado inconsistente):
 
-1. Use o botão **Sair** para apagar a sessão do armazenamento seguro.
-2. Feche o aplicativo.
-3. Apague o diretório `Nexa Messaging/matrix` da plataforma.
+1. Use o botão **Sair**. O app revoga o access token no homeserver, para o sync e apaga o SQLite local e a sessão do armazenamento seguro.
+2. Se o homeserver estiver inacessível, a limpeza local ainda acontece. O dispositivo **Nexa Desktop** pode permanecer na conta até o token expirar ou até ser removido por outro cliente. Veja [Limitações](limitacoes.md#logout-sem-o-homeserver-disponível).
 
-O passo 3 remove as chaves E2EE locais. Depois disso, as mensagens antigas só podem ser lidas novamente com a Recovery Key.
-
-Como o logout atual não invalida o dispositivo no servidor, também é recomendável remover a sessão **Nexa Desktop** antiga pela lista de dispositivos de outro cliente. Veja [Limitações](limitacoes.md#logout-apenas-local).
+Se o app recusar abrir com *the account in the store doesn't match the account in the constructor*, o SQLite local é de outro dispositivo. Feche o app e apague `%APPDATA%\Nexa Messaging`. No próximo login o store é recriado; salas com E2EE podem exigir a Recovery Key.

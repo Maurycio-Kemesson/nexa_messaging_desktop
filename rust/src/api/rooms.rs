@@ -95,42 +95,11 @@ pub async fn get_messages(
         .await
         .map_err(|error| error.to_string())?;
 
-    println!(
-        "NEXA: room={} eventos retornados={}",
-        room_id,
-        response.chunk.len()
-    );
-
-    println!(
-        "NEXA: start_token={}",
-        response.start
-    );
-
-    println!(
-        "NEXA: end_token={:?}",
-        response.end
-    );
-
     let mut messages = Vec::new();
 
     for event in response.chunk {
-        match event.kind {
-            TimelineEventKind::Decrypted(_) => {
-                println!("NEXA: evento E2EE descriptografado");
-            }
-
-            TimelineEventKind::PlainText { .. } => {
-                println!("NEXA: evento plaintext");
-            }
-
-            TimelineEventKind::UnableToDecrypt { utd_info, .. } => {
-                println!(
-                    "NEXA: não foi possível descriptografar evento: {:?}",
-                    utd_info
-                );
-
-                continue;
-            }
+        if matches!(event.kind, TimelineEventKind::UnableToDecrypt { .. }) {
+            continue;
         }
 
         let event = event
@@ -138,40 +107,22 @@ pub async fn get_messages(
             .deserialize()
             .map_err(|error| error.to_string())?;
 
-        let event_debug = format!("{event:?}");
-
         let AnySyncTimelineEvent::MessageLike(
             AnySyncMessageLikeEvent::RoomMessage(message),
         ) = event
         else {
-            println!(
-                "NEXA: evento ignorado - não é RoomMessage: {}",
-                event_debug
-            );
-
             continue;
         };
 
         let Some(message) = message.as_original() else {
-            println!(
-                "NEXA: evento ignorado - não é evento original"
-            );
-
             continue;
         };
 
-        let content = match &message.content.msgtype {
-            MessageType::Text(text) => text.body.clone(),
-
-            _ => {
-                println!(
-                    "NEXA: evento ignorado - tipo de mensagem não suportado: {:?}",
-                    message.content.msgtype
-                );
-
-                continue;
-            }
+        let MessageType::Text(text) = &message.content.msgtype else {
+            continue;
         };
+
+        let content = text.body.clone();
 
         messages.push(MessageSummary {
             id: message.event_id.to_string(),
@@ -181,12 +132,6 @@ pub async fn get_messages(
             timestamp: message.origin_server_ts.get().into(),
         });
     }
-
-    println!(
-        "NEXA: room={} mensagens convertidas={}",
-        room_id,
-        messages.len()
-    );
 
     messages.sort_by_key(|message| message.timestamp);
 
@@ -224,18 +169,11 @@ pub async fn send_message(
 pub async fn subscribe_to_messages(
     sink: StreamSink<MessageSummary>,
 ) {
-    println!("NEXA: subscribe_to_messages iniciado");
-
     let mut receiver = matrix_message_sender().subscribe();
 
     loop {
         match receiver.recv().await {
             Ok(message) => {
-                println!(
-                    "NEXA: nova mensagem recebida: {:?}",
-                    message
-                );
-
                 if let Err(error) = sink.add(message) {
                     eprintln!(
                         "NEXA: erro ao enviar mensagem para Flutter: {error}"

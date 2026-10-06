@@ -13,11 +13,14 @@ class FakeRecoveryRepository implements RecoveryRepository {
 }
 
 void main() {
-  test('RecoveryUseCase delegates the recovery key to the repository', () async {
-    final repository = FakeRecoveryRepository();
+  test(
+    'RecoveryUseCase delegates the recovery key to the repository',
+    () async {
+      final repository = FakeRecoveryRepository();
 
-    await RecoveryUseCase(repository)(recoveryKey: 'key');
+      await RecoveryUseCase(repository)(recoveryKey: 'key');
 
-    expect(repository.recoveryKey, 'key');
-  });
+      expect(repository.recoveryKey, 'key');
+    },
+  );
 }

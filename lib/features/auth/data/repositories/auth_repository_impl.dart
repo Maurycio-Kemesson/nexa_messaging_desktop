@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:nexa_messaging_desktop/features/auth/data/datasources/auth_session_storage.dart';
 import 'package:nexa_messaging_desktop/features/auth/domain/entities/auth_session_entity.dart';
 import 'package:nexa_messaging_desktop/src/rust/api/client.dart' as rust_api;
@@ -33,7 +32,7 @@ class AuthRepositoryImpl implements AuthRepository {
 
     await _sessionStorage.save(entity);
 
-    rust_api.startMatrixSync();
+    await rust_api.startMatrixSync();
 
     return entity;
   }
@@ -54,17 +53,17 @@ class AuthRepositoryImpl implements AuthRepository {
       refreshToken: session.refreshToken,
     );
 
-    final backup = await rust_api.checkMatrixBackup();
-
-    debugPrint('BACKUP MATRIX: $backup');
-
-    rust_api.startMatrixSync();
+    await rust_api.startMatrixSync();
 
     return session;
   }
 
   @override
-  Future<void> logout() {
-    return _sessionStorage.clear();
+  Future<void> logout() async {
+    try {
+      await rust_api.logoutMatrix();
+    } finally {
+      await _sessionStorage.clear();
+    }
   }
 }

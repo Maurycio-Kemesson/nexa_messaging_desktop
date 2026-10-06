@@ -201,7 +201,7 @@ void main() {
       expect(state.isInitialized, isTrue);
     });
 
-    test('keeps the session and exposes the error on failure', () async {
+    test('ends the local session and exposes the server error', () async {
       repository
         ..storedSession = _session
         ..logoutError = Exception('logout failed');
@@ -211,7 +211,7 @@ void main() {
 
       final state = container.read(authViewModelProvider);
       expect(state.isLoading, isFalse);
-      expect(state.session, same(_session));
+      expect(state.session, isNull);
       expect(state.error, 'Exception: logout failed');
     });
   });

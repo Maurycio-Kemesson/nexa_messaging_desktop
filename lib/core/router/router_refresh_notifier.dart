@@ -5,10 +5,7 @@ import '../../features/auth/presentation/viewmodels/auth_view_model.dart';
 
 class RouterRefreshNotifier extends ChangeNotifier {
   RouterRefreshNotifier(this.ref) {
-    ref.listen(authViewModelProvider, (_, _) {
-      debugPrint('ROUTER: estado de autenticação mudou');
-      notifyListeners();
-    });
+    ref.listen(authViewModelProvider, (_, _) => notifyListeners());
   }
 
   final Ref ref;
