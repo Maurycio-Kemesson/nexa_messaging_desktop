@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nexa_messaging_desktop/core/theme/app_colors.dart';
+import 'package:nexa_messaging_desktop/core/widgets/nexa_logo.dart';
 import 'package:nexa_messaging_desktop/features/auth/presentation/viewmodels/auth_state.dart';
 
 import '../viewmodels/auth_view_model.dart';
@@ -29,39 +31,63 @@ class _AuthContentState extends ConsumerState<AuthContent> {
     super.dispose();
   }
 
+  void _submit() {
+    final AuthState state = ref.read(authViewModelProvider);
+    if (state.isLoading) {
+      return;
+    }
+
+    ref
+        .read(authViewModelProvider.notifier)
+        .login(
+          homeserver: _homeserverController.text.trim(),
+          username: _usernameController.text.trim(),
+          password: _passwordController.text,
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
     final AuthState state = ref.watch(authViewModelProvider);
-    final AuthViewModel viewModel = ref.read(authViewModelProvider.notifier);
+    final TextTheme textTheme = Theme.of(context).textTheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
-          'Nexa Messaging',
+        const Center(child: NexaLogo(height: 56)),
+        const SizedBox(height: 28),
+        Text(
+          'Entre na sua conta',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+          style: textTheme.titleLarge,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Use o homeserver Matrix e suas credenciais para continuar.',
+          textAlign: TextAlign.center,
+          style: textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
         ),
         const SizedBox(height: 32),
         TextField(
           controller: _homeserverController,
           enabled: !state.isLoading,
+          keyboardType: TextInputType.url,
+          textInputAction: TextInputAction.next,
           decoration: const InputDecoration(
             labelText: 'Homeserver',
             hintText: 'https://matrix.org',
-            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.dns_outlined),
           ),
         ),
-
         const SizedBox(height: 16),
-
         TextField(
           controller: _usernameController,
           enabled: !state.isLoading,
+          textInputAction: TextInputAction.next,
           decoration: const InputDecoration(
             labelText: 'Usuário',
             hintText: 'mauryciokemesson',
-            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.person_outline),
           ),
         ),
         const SizedBox(height: 16),
@@ -69,27 +95,24 @@ class _AuthContentState extends ConsumerState<AuthContent> {
           controller: _passwordController,
           enabled: !state.isLoading,
           obscureText: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => _submit(),
           decoration: const InputDecoration(
             labelText: 'Senha',
-            border: OutlineInputBorder(),
+            prefixIcon: Icon(Icons.lock_outline),
           ),
         ),
         const SizedBox(height: 24),
-        ElevatedButton(
-          onPressed: state.isLoading
-              ? null
-              : () {
-                  viewModel.login(
-                    homeserver: _homeserverController.text.trim(),
-                    username: _usernameController.text.trim(),
-                    password: _passwordController.text,
-                  );
-                },
+        FilledButton(
+          onPressed: state.isLoading ? null : _submit,
           child: state.isLoading
               ? const SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.navy,
+                  ),
                 )
               : const Text('Entrar'),
         ),
@@ -98,7 +121,7 @@ class _AuthContentState extends ConsumerState<AuthContent> {
           Text(
             state.error!,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.red),
+            style: textTheme.bodyMedium?.copyWith(color: AppColors.error),
           ),
         ],
         if (state.session != null) ...[
@@ -106,6 +129,7 @@ class _AuthContentState extends ConsumerState<AuthContent> {
           Text(
             'Autenticado como ${state.session!.userId}',
             textAlign: TextAlign.center,
+            style: textTheme.bodyMedium?.copyWith(color: AppColors.teal),
           ),
         ],
       ],

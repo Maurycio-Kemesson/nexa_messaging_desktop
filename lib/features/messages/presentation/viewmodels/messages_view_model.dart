@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nexa_messaging_desktop/features/auth/presentation/viewmodels/auth_view_model.dart';
 import 'package:nexa_messaging_desktop/features/messages/domain/entities/messages_entity.dart';
 
 import '../../domain/usecases/messages_usecase.dart';
@@ -14,9 +14,7 @@ messagesViewModelProvider = NotifierProvider<MessagesViewModel, MessagesState>(
 );
 
 class MessagesViewModel extends Notifier<MessagesState> {
-  late final MessagesUseCase _messagesUseCase;
-
-  StreamSubscription<MessageEntity>? _messagesSubscription;
+  MessagesUseCase get _messagesUseCase => ref.read(messagesUseCaseProvider);
 
   String? _currentRoomId;
   String? _historyEndToken;
@@ -24,13 +22,22 @@ class MessagesViewModel extends Notifier<MessagesState> {
 
   @override
   MessagesState build() {
-    _messagesUseCase = ref.read(messagesUseCaseProvider);
+    ref.watch(currentSessionProvider);
 
-    ref.onDispose(() {
-      _messagesSubscription?.cancel();
-    });
+    _currentRoomId = null;
+    _historyEndToken = null;
+    _isLoadingMore = false;
 
-    _startMessageUpdates();
+    final StreamSubscription<MessageEntity> subscription = _messagesUseCase
+        .watchMessages()
+        .listen(
+          _onMessageReceived,
+          onError: (Object error) {
+            state = state.copyWith(error: error.toString());
+          },
+        );
+
+    ref.onDispose(subscription.cancel);
 
     return const MessagesState();
   }
@@ -44,10 +51,18 @@ class MessagesViewModel extends Notifier<MessagesState> {
     try {
       final page = await _messagesUseCase.call(roomId: roomId);
 
+      if (roomId != _currentRoomId) {
+        return;
+      }
+
       _historyEndToken = page.endToken;
 
       state = state.copyWith(isLoading: false, messages: page.messages);
     } catch (error) {
+      if (roomId != _currentRoomId) {
+        return;
+      }
+
       state = state.copyWith(isLoading: false, error: error.toString());
     }
   }
@@ -70,21 +85,22 @@ class MessagesViewModel extends Notifier<MessagesState> {
         message: trimmedMessage,
       );
 
-      await loadMessages(roomId: roomId);
+      if (_isCurrentRoom(roomId)) {
+        await loadMessages(roomId: roomId);
+      }
 
       state = state.copyWith(isSending: false);
     } catch (error) {
-      state = state.copyWith(isSending: false, error: error.toString());
+      if (_isCurrentRoom(roomId)) {
+        state = state.copyWith(isSending: false, error: error.toString());
+      } else {
+        state = state.copyWith(isSending: false);
+      }
     }
   }
 
-  void _startMessageUpdates() {
-    _messagesSubscription = _messagesUseCase.watchMessages().listen(
-      _onMessageReceived,
-      onError: (Object error) {
-        state = state.copyWith(error: error.toString());
-      },
-    );
+  bool _isCurrentRoom(String roomId) {
+    return _currentRoomId == null || _currentRoomId == roomId;
   }
 
   void _onMessageReceived(MessageEntity message) {
@@ -102,35 +118,24 @@ class MessagesViewModel extends Notifier<MessagesState> {
   }
 
   Future<void> loadMoreMessages() async {
-    if (_currentRoomId == null) {
-      return;
-    }
+    final String? roomId = _currentRoomId;
+    final String? fromToken = _historyEndToken;
 
-    if (_historyEndToken == null) {
-      return;
-    }
-
-    if (_isLoadingMore) {
+    if (roomId == null || fromToken == null || _isLoadingMore) {
       return;
     }
 
     _isLoadingMore = true;
 
-    debugPrint(
-      'MESSAGES: carregando mensagens anteriores. '
-      'token=$_historyEndToken',
-    );
-
     try {
       final page = await _messagesUseCase.call(
-        roomId: _currentRoomId!,
-        fromToken: _historyEndToken,
+        roomId: roomId,
+        fromToken: fromToken,
       );
 
-      debugPrint(
-        'MESSAGES: carregadas '
-        '${page.messages.length} mensagens anteriores',
-      );
+      if (roomId != _currentRoomId) {
+        return;
+      }
 
       _historyEndToken = page.endToken;
 
@@ -142,7 +147,9 @@ class MessagesViewModel extends Notifier<MessagesState> {
 
       state = state.copyWith(messages: [...newMessages, ...state.messages]);
     } catch (error) {
-      state = state.copyWith(error: error.toString());
+      if (roomId == _currentRoomId) {
+        state = state.copyWith(error: error.toString());
+      }
     } finally {
       _isLoadingMore = false;
     }

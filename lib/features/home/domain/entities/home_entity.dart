@@ -1,7 +1,5 @@
 class HomeEntity {
-  const HomeEntity({
-    required this.id,
-  });
+  const HomeEntity({required this.id});
 
   final String id;
 }

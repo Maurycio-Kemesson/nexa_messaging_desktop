@@ -1,10 +1,9 @@
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    Mutex,
-    OnceLock,
+use std::{
+    sync::{Mutex, OnceLock},
+    thread::JoinHandle,
 };
 
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, oneshot};
 
 use matrix_sdk::{
     authentication::{
@@ -31,7 +30,7 @@ use matrix_sdk::{
     Client,
 };
 
-use super::matrix::{create_matrix_client, AuthSession};
+use super::matrix::AuthSession;
 use super::rooms::MessageSummary;
 
 static MATRIX_CLIENT: OnceLock<Mutex<Option<Client>>> = OnceLock::new();
@@ -43,7 +42,16 @@ fn matrix_client() -> &'static Mutex<Option<Client>> {
 static MATRIX_MESSAGE_CHANNEL: OnceLock<broadcast::Sender<MessageSummary>> =
     OnceLock::new();
 
-static MATRIX_SYNC_STARTED: AtomicBool = AtomicBool::new(false);
+struct SyncHandle {
+    shutdown: oneshot::Sender<()>,
+    thread: JoinHandle<()>,
+}
+
+static MATRIX_SYNC: OnceLock<Mutex<Option<SyncHandle>>> = OnceLock::new();
+
+fn matrix_sync() -> &'static Mutex<Option<SyncHandle>> {
+    MATRIX_SYNC.get_or_init(|| Mutex::new(None))
+}
 
 #[flutter_rust_bridge::frb(ignore)]
 pub fn matrix_message_sender() -> &'static broadcast::Sender<MessageSummary> {
@@ -58,33 +66,11 @@ pub fn subscribe_to_matrix_messages() -> broadcast::Receiver<MessageSummary> {
     matrix_message_sender().subscribe()
 }
 
-#[flutter_rust_bridge::frb]
-pub async fn connect_matrix() -> Result<String, String> {
-    let client = create_matrix_client()
-        .await
-        .map_err(|error| error.to_string())?;
-
-    let homeserver = client.homeserver().to_string();
-
-    let mut stored_client = matrix_client()
-        .lock()
-        .map_err(|error| error.to_string())?;
-
-    *stored_client = Some(client);
-
-    Ok(homeserver)
-}
-
-#[flutter_rust_bridge::frb]
-pub async fn login_matrix(
-    homeserver: String,
-    username: String,
-    password: String,
-) -> Result<AuthSession, String> {
+async fn build_client(homeserver: &str) -> Result<Client, String> {
     let store_path = matrix_store_path()?;
 
-    let client = Client::builder()
-        .homeserver_url(&homeserver)
+    Client::builder()
+        .homeserver_url(homeserver)
         .sqlite_store(store_path, None)
         .with_encryption_settings(EncryptionSettings {
             auto_enable_cross_signing: true,
@@ -93,7 +79,44 @@ pub async fn login_matrix(
         })
         .build()
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| error.to_string())
+}
+
+/// O login por senha cria um dispositivo novo. O SQLite de outro
+/// dispositivo no mesmo diretório faz o SDK recusar o store.
+async fn reset_local_matrix_state() -> Result<(), String> {
+    let _ = stop_matrix_sync().await;
+
+    {
+        let mut stored_client = matrix_client()
+            .lock()
+            .map_err(|error| error.to_string())?;
+        *stored_client = None;
+    }
+
+    let store_path = matrix_store_path()?;
+
+    if let Err(error) = std::fs::remove_dir_all(&store_path) {
+        if error.kind() != std::io::ErrorKind::NotFound {
+            return Err(format!(
+                "Não foi possível apagar o store local em {:?}: {error}. Feche o app e apague a pasta.",
+                store_path
+            ));
+        }
+    }
+
+    std::fs::create_dir_all(&store_path).map_err(|error| error.to_string())
+}
+
+#[flutter_rust_bridge::frb]
+pub async fn login_matrix(
+    homeserver: String,
+    username: String,
+    password: String,
+) -> Result<AuthSession, String> {
+    reset_local_matrix_state().await?;
+
+    let client = build_client(&homeserver).await?;
 
     let response = client
         .matrix_auth()
@@ -110,12 +133,6 @@ pub async fn login_matrix(
         access_token: response.access_token,
         refresh_token: response.refresh_token,
     };
-
-    println!(
-        "NEXA: login concluído user_id={} device_id={}",
-        session.user_id,
-        session.device_id
-    );
 
     let mut stored_client = matrix_client()
         .lock()
@@ -134,21 +151,7 @@ pub async fn restore_matrix_session(
     access_token: String,
     refresh_token: Option<String>,
 ) -> Result<(), String> {
-    println!(
-        "NEXA: restaurando sessão user_id={} device_id={}",
-        user_id, device_id
-    );
-
-    let store_path = matrix_store_path()?;
-
-    println!("NEXA: restaurando SQLite em {:?}", store_path);
-
-    let client = Client::builder()
-        .homeserver_url(&homeserver)
-        .sqlite_store(store_path, None)
-        .build()
-        .await
-        .map_err(|error| error.to_string())?;
+    let client = build_client(&homeserver).await?;
 
     let user_id = UserId::parse(&user_id)
         .map_err(|error| error.to_string())?;
@@ -166,18 +169,10 @@ pub async fn restore_matrix_session(
         },
     };
 
-    println!(
-        "NEXA: chamando restore_session para {} / {}",
-        session.meta.user_id,
-        session.meta.device_id
-    );
-
     client
         .restore_session(session)
         .await
         .map_err(|error| error.to_string())?;
-
-    println!("NEXA: sessão restaurada com sucesso");
 
     let mut stored_client = matrix_client()
         .lock()
@@ -185,46 +180,40 @@ pub async fn restore_matrix_session(
 
     *stored_client = Some(client);
 
-    println!("NEXA: cliente Matrix armazenado globalmente");
-
     Ok(())
 }
 
 #[flutter_rust_bridge::frb]
 pub fn start_matrix_sync() -> Result<(), String> {
-    if MATRIX_SYNC_STARTED.swap(true, Ordering::SeqCst) {
-        println!("NEXA: Matrix sync já está iniciado");
+    let mut sync = matrix_sync()
+        .lock()
+        .map_err(|error| error.to_string())?;
+
+    if sync
+        .as_ref()
+        .is_some_and(|handle| !handle.thread.is_finished())
+    {
         return Ok(());
     }
 
-    let client = match get_authenticated_client() {
-        Ok(client) => client,
-        Err(error) => {
-            MATRIX_SYNC_STARTED.store(false, Ordering::SeqCst);
-            return Err(error);
-        }
-    };
+    let client = get_authenticated_client()?;
 
-    std::thread::spawn(move || {
+    let (shutdown_sender, shutdown_receiver) = oneshot::channel::<()>();
+
+    let thread = std::thread::spawn(move || {
         let runtime = match tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
         {
             Ok(runtime) => runtime,
             Err(error) => {
-                eprintln!(
-                    "NEXA: erro ao criar runtime do Matrix sync: {error}"
-                );
-
-                MATRIX_SYNC_STARTED.store(false, Ordering::SeqCst);
+                eprintln!("NEXA: erro ao criar runtime do Matrix sync: {error}");
                 return;
             }
         };
 
         runtime.block_on(async move {
-            println!("NEXA: Matrix sync iniciado");
-
-            let _event_handler = client.add_event_handler(
+            client.add_event_handler(
                 move |
                     event: OriginalSyncRoomMessageEvent,
                     room: matrix_sdk::Room,
@@ -243,38 +232,75 @@ pub fn start_matrix_sync() -> Result<(), String> {
                         timestamp: event.origin_server_ts.get().into(),
                     };
 
-                    println!(
-                        "NEXA: nova mensagem recebida: {:?}",
-                        message
-                    );
-
                     let _ = matrix_message_sender().send(message);
                 },
             );
 
-            let result = client
-                .sync(SyncSettings::default())
-                .await;
-
-            match result {
-                Ok(_) => {
-                    println!("NEXA: Matrix sync finalizado");
+            tokio::select! {
+                result = client.sync(SyncSettings::default()) => {
+                    if let Err(error) = result {
+                        eprintln!("NEXA: Matrix sync error: {error}");
+                    }
                 }
-
-                Err(error) => {
-                    eprintln!(
-                        "NEXA: Matrix sync error: {error}"
-                    );
-                }
+                _ = shutdown_receiver => {}
             }
         });
+    });
 
-        MATRIX_SYNC_STARTED.store(false, Ordering::SeqCst);
-
-        println!("NEXA: Matrix sync encerrado");
+    *sync = Some(SyncHandle {
+        shutdown: shutdown_sender,
+        thread,
     });
 
     Ok(())
+}
+
+async fn stop_matrix_sync() -> Result<(), String> {
+    let handle = matrix_sync()
+        .lock()
+        .map_err(|error| error.to_string())?
+        .take();
+
+    let Some(handle) = handle else {
+        return Ok(());
+    };
+
+    let _ = handle.shutdown.send(());
+
+    tokio::task::spawn_blocking(move || handle.thread.join())
+        .await
+        .map_err(|error| error.to_string())?
+        .map_err(|_| "Matrix sync thread panicked".to_string())
+}
+
+/// Encerra a sessão no homeserver, para o sync e apaga o store local.
+///
+/// O estado local é sempre limpo, mesmo que o homeserver esteja inacessível.
+/// Nesse caso o erro do servidor é devolvido depois da limpeza.
+#[flutter_rust_bridge::frb]
+pub async fn logout_matrix() -> Result<(), String> {
+    stop_matrix_sync().await?;
+
+    let client = matrix_client()
+        .lock()
+        .map_err(|error| error.to_string())?
+        .take();
+
+    let server_result = match client {
+        Some(client) => client
+            .logout()
+            .await
+            .map_err(|error| error.to_string()),
+        None => Ok(()),
+    };
+
+    let store_path = matrix_store_path()?;
+
+    if let Err(error) = std::fs::remove_dir_all(&store_path) {
+        eprintln!("NEXA: não foi possível apagar o store local: {error}");
+    }
+
+    server_result
 }
 
 pub(crate) fn get_authenticated_client() -> Result<Client, String> {
@@ -305,37 +331,15 @@ fn matrix_store_path() -> Result<std::path::PathBuf, String> {
 }
 
 #[flutter_rust_bridge::frb]
-pub async fn check_matrix_backup() -> Result<String, String> {
-    let client = get_authenticated_client()?;
-
-    let exists = client
-        .encryption()
-        .backups()
-        .fetch_exists_on_server()
-        .await
-        .map_err(|error| error.to_string())?;
-
-    println!("NEXA: backup existe no servidor? {exists}");
-
-    Ok(format!("backup_exists={exists}"))
-}
-
-#[flutter_rust_bridge::frb]
 pub async fn recover_matrix_encryption(
     recovery_key: String,
 ) -> Result<(), String> {
     let client = get_authenticated_client()?;
-
-    println!("NEXA: iniciando recuperação E2EE...");
 
     client
         .encryption()
         .recovery()
         .recover(&recovery_key)
         .await
-        .map_err(|error| error.to_string())?;
-
-    println!("NEXA: recuperação E2EE concluída");
-
-    Ok(())
+        .map_err(|error| error.to_string())
 }

@@ -84,7 +84,6 @@ O `RouterRefreshNotifier` escuta o `authViewModelProvider` e força a reavaliaç
 | `/authentication` | `AuthView` | Login no homeserver. |
 | `/home` | `HomeView` | Lista de salas e conversa selecionada. |
 | `/recovery` | `RecoveryView` | Recuperação das chaves E2EE com a Recovery Key. |
-| `/rust-test` | `RustTestView` | Tela de diagnóstico da integração com o Rust, usada durante o desenvolvimento. |
 
 ## Features
 
@@ -95,7 +94,6 @@ O `RouterRefreshNotifier` escuta o `authViewModelProvider` e força a reavaliaç
 | `rooms` | Listagem e seleção das salas em que o usuário entrou. |
 | `messages` | Histórico paginado, envio de mensagens e atualização em tempo real. |
 | `recovery` | Recuperação do estado criptográfico a partir do backup de chaves ([ADR 004](adr/004-persistencia-e-recuperacao-e2ee.md)). |
-| `rust_test` | Diagnóstico da ponte Flutter/Rust (função `greet` e conexão ao `matrix.org`). |
 
 ## Camada Rust
 
@@ -103,10 +101,10 @@ O crate fica em `rust/` e é compilado como `cdylib`/`staticlib` com o nome `rus
 
 | Arquivo | Conteúdo |
 | --- | --- |
-| `api/client.rs` | Cliente Matrix global, login, restauração de sessão, sincronização em segundo plano, backup e recuperação E2EE. |
+| `api/client.rs` | Cliente Matrix global, login, restauração, logout, sincronização em segundo plano e recuperação E2EE. |
 | `api/rooms.rs` | Listagem de salas, histórico paginado, envio de mensagens e stream de novas mensagens. |
-| `api/matrix.rs` | Tipo `AuthSession`, criação de cliente de teste e testes de integração. |
-| `api/simple.rs` | Função `greet` e inicialização padrão do FRB. |
+| `api/matrix.rs` | Tipo `AuthSession` compartilhado com o Flutter. |
+| `api/simple.rs` | Inicialização padrão do FRB (`init_app`). |
 | `frb_generated.rs` | Código gerado pelo FRB. Não editar. |
 
 ### Estado global no Rust
@@ -115,7 +113,7 @@ O Rust mantém três estados globais, inicializados sob demanda:
 
 * `MATRIX_CLIENT: OnceLock<Mutex<Option<Client>>>`: o `matrix_sdk::Client` autenticado. É preenchido pelo login ou pela restauração e lido por todas as outras operações através de `get_authenticated_client()`. O `Client` é clonável e internamente compartilhado (`Arc`), então cada operação trabalha com um clone barato.
 * `MATRIX_MESSAGE_CHANNEL: OnceLock<broadcast::Sender<MessageSummary>>`: canal `tokio::sync::broadcast` (capacidade 100) que distribui as mensagens recebidas pelo sync para os assinantes do Flutter.
-* `MATRIX_SYNC_STARTED: AtomicBool`: impede que mais de um loop de sincronização seja iniciado.
+* `MATRIX_SYNC: OnceLock<Mutex<Option<SyncHandle>>>`: handle da thread de sync e um `oneshot` para encerrá-la no logout. Se o sync já estiver em execução, `start_matrix_sync` não cria outra thread.
 
 ### Persistência local do Matrix
 
@@ -140,7 +138,6 @@ main()
                  └─ AuthRepository.getSession()
                       ├─ SecureAuthSessionStorage.get()      sem sessão → tela de login
                       ├─ restoreMatrixSession(...)           Rust: Client + SQLite + restore_session
-                      ├─ checkMatrixBackup()                 diagnóstico do backup E2EE
                       └─ startMatrixSync()                   inicia o sync em segundo plano
        └─ isInitialized = true → router redireciona para /home
 ```
@@ -158,6 +155,18 @@ AuthView ─► AuthViewModel.login ─► AuthUseCase ─► AuthRepositoryImpl
   └─ SecureAuthSessionStorage.save(sessão)
   └─ startMatrixSync()
 ```
+
+### Logout
+
+```text
+AuthViewModel.logout ─► AuthUseCase ─► AuthRepositoryImpl.logout
+  └─ logoutMatrix()
+       Rust: para o sync, client.logout() no homeserver, descarta o Client, apaga o SQLite
+  └─ SecureAuthSessionStorage.clear()     sempre, mesmo se o homeserver falhar
+  └─ session = null → router redireciona para /authentication
+```
+
+O `currentSessionProvider` muda com o logout. `RoomsViewModel` e `MessagesViewModel` observam essa sessão e descartam o estado da conta anterior.
 
 ### Listagem de salas
 
@@ -202,6 +211,7 @@ Acessada pelo ícone de nuvem na `HomeView`. A `RecoveryView` recebe a Recovery 
 * Credenciais da sessão (`access_token`, `refresh_token`, `user_id`, `device_id`, `homeserver`) são persistidas apenas pelo `flutter_secure_storage`, que usa o cofre de credenciais do sistema operacional: Credential Manager/DPAPI no Windows, Keychain no macOS e `libsecret` no Linux.
 * A senha do usuário é usada somente na chamada de login e não é armazenada.
 * A Recovery Key não é armazenada nem registrada em logs.
+* O logout revoga o access token no homeserver, encerra o sync e apaga o SQLite local.
 * Toda a criptografia E2EE é responsabilidade do Matrix Rust SDK. O aplicativo não implementa primitivas criptográficas.
 * A comunicação com o homeserver usa HTTPS via `rustls`.
 

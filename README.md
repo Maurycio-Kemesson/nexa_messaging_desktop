@@ -35,7 +35,7 @@ O **Nexa** é um cliente de mensageria desktop desenvolvido como parte de um des
 | Plataforma | Status |
 | --- | --- |
 | Windows 10/11 (x64) | Suportada (plataforma principal de desenvolvimento) |
-| macOS | Configurada; requer permissão de rede nas entitlements ([detalhes](docs/limitacoes.md#macos-sem-permissão-de-rede-de-saída)) |
+| macOS | Configurada; permissão de rede nas entitlements já incluída ([detalhes](docs/limitacoes.md#macos-sem-validação-de-ponta-a-ponta)) |
 | Linux (x64) | Configurada; requer `libgtk-3-dev` e `libsecret-1-dev` |
 
 Android, iOS e Web estão fora do escopo.
@@ -122,7 +122,7 @@ Detalhes em [Arquitetura](docs/arquitetura.md) e [Comunicação Flutter/Rust](do
 
 ## Testes
 
-O projeto tem **100 testes unitários** que cobrem State, Use Case e ViewModel de todas as features (`auth`, `home`, `rooms`, `messages`, `recovery` e `rust_test`). As ViewModels são testadas com Repositories falsos injetados pelo Riverpod, então os testes não dependem do Rust nem de rede.
+O projeto tem testes de State, Use Case, ViewModel e widget das features `auth`, `home`, `rooms`, `messages` e `recovery`. As ViewModels e as telas são testadas com Repositories falsos injetados pelo Riverpod, então os testes não dependem do Rust nem de rede.
 
 ```bash
 flutter test

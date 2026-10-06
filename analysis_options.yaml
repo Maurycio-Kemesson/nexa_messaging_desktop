@@ -9,7 +9,7 @@ analyzer:
     - "**/*.freezed.dart"
     - "lib/generated/**"
     - "tool/mason/**"
-
+    - "build/**"
     - rust_builder/cargokit/**
 linter:
   rules:

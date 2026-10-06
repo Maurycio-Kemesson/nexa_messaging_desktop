@@ -4,18 +4,9 @@ O Nexa prioriza os fluxos essenciais do desafio técnico: autenticação, sessã
 
 ## Plataformas
 
-### macOS sem permissão de rede de saída
+### macOS sem validação de ponta a ponta
 
-O app roda em sandbox no macOS (`com.apple.security.app-sandbox`), mas as entitlements não incluem `com.apple.security.network.client`. Sem essa permissão, o sandbox bloqueia as conexões de saída e o cliente não consegue acessar o homeserver.
-
-**Correção:** adicionar a chave abaixo em `macos/Runner/DebugProfile.entitlements` e `macos/Runner/Release.entitlements`:
-
-```xml
-<key>com.apple.security.network.client</key>
-<true/>
-```
-
-Também pode ser necessário habilitar o **Keychain Sharing** no Xcode para o `flutter_secure_storage`.
+As entitlements de Debug e Release incluem `com.apple.security.network.client`, necessária para o sandbox liberar as conexões com o homeserver. O app ainda não foi executado em um Mac, e pode ser necessário habilitar o **Keychain Sharing** no Xcode para o `flutter_secure_storage`.
 
 ### Validação concentrada no Windows
 
@@ -35,33 +26,21 @@ O instalador e o executável não são assinados digitalmente, então o SmartScr
 
 Apenas `m.login.password` é suportado. SSO, OIDC (Matrix Authentication Service), login por QR code e registro de novas contas não estão implementados. Contas criadas com login social, sem senha, não conseguem entrar.
 
-### Logout apenas local
+### Logout sem o homeserver disponível
 
-O logout apaga a sessão do `flutter_secure_storage`, mas:
+`logout_matrix` para o sync, revoga o access token no homeserver (o dispositivo **Nexa Desktop** deixa de existir), descarta o `Client` global e apaga o SQLite local. A limpeza local acontece mesmo se o homeserver estiver inacessível. Nesse caso o erro é exibido, mas o token continua válido no servidor até expirar ou até o dispositivo ser removido por outro cliente.
 
-* não chama o logout do Matrix, então o dispositivo **Nexa Desktop** e o access token continuam válidos no servidor;
-* não remove o `Client` global do Rust nem interrompe o sync em execução;
-* não apaga o SQLite local.
+Se o Windows mantiver algum arquivo do SQLite aberto, a remoção do store pode falhar. O erro é registrado no console e o próximo login reaproveita o diretório.
 
-**Melhoria:** expor uma função `logout_matrix` no Rust que chame `client.matrix_auth().logout()`, encerre o sync e limpe o cliente global e, opcionalmente, o store.
+### Uma conta por vez
 
-### Uma conta por processo
+O cliente Matrix é um singleton no Rust e o SQLite usa um diretório fixo (`Nexa Messaging/matrix`). Como o logout encerra o sync e apaga esse diretório, é possível trocar de conta sem fechar o app, mas não há suporte a várias contas conectadas ao mesmo tempo.
 
-O cliente Matrix é um singleton no Rust e o SQLite usa um diretório fixo (`Nexa Messaging/matrix`), compartilhado por qualquer conta. Por consequência:
-
-* não há suporte a múltiplas contas;
-* trocar de conta sem fechar o app pode manter o sync da conta anterior ativo, porque `start_matrix_sync` não reinicia um sync já em execução;
-* entrar com outra conta sobre o mesmo store pode gerar conflito de estado. O recomendado é apagar o diretório local antes (ver [Configuração do Matrix](configuracao-matrix.md#redefinindo-o-estado-local)).
-
-**Melhoria:** separar o store por `user_id` e encerrar o cliente anterior no logout.
+**Melhoria:** separar o store por `user_id` e manter um `Client` por conta.
 
 ### Renovação de token não configurada
 
 O login solicita um refresh token, mas o `Client` não é construído com `handle_refresh_tokens()` e os tokens renovados não são gravados de volta no armazenamento seguro. Em homeservers que expiram o access token, a sessão restaurada pode deixar de funcionar e exigir novo login.
-
-### Configuração de criptografia aplicada só no login
-
-`EncryptionSettings` (cross-signing e backups automáticos) é aplicada em `login_matrix`, mas não em `restore_matrix_session`. Em uma sessão restaurada, o download automático de chaves do backup após falha de descriptografia não fica configurado da mesma forma.
 
 ### SQLite sem senha
 
@@ -107,9 +86,11 @@ As funções retornam `Result<T, String>`. O Flutter recebe apenas a mensagem de
 
 **Melhoria:** criar um `enum` de erro no Rust (por exemplo `NexaError { InvalidCredentials, Network, SessionExpired, ... }`), que o FRB converte em uma classe Dart tratável com `switch`.
 
-### Sync sem controle de ciclo de vida
+### Sync sem reinício automático
 
-Não existe função para parar o sync. Se o loop terminar por erro, nada o reinicia automaticamente até uma nova chamada de `startMatrixSync`. Além disso, `startMatrixSync()` é chamada sem `await` no Repository, então um erro na inicialização do sync não chega à interface.
+O sync é encerrado no logout, mas, se o loop terminar por erro de rede, nada o reinicia até uma nova chamada de `startMatrixSync` (novo login ou reabertura do app). Erros durante o sync são apenas registrados no console e não chegam à interface.
+
+**Melhoria:** reiniciar o sync com backoff exponencial e expor o estado da conexão em um `Stream` para a interface.
 
 ### Broadcast com capacidade limitada
 
@@ -117,20 +98,14 @@ O canal de mensagens em tempo real tem capacidade de 100 itens. Se o Flutter nã
 
 ## Observabilidade e segurança
 
-### Logs de depuração com dados sensíveis
+### Logs sem níveis
 
-O Rust escreve logs com `println!` (prefixo `NEXA:`) que incluem `user_id`, `device_id` e o **conteúdo das mensagens recebidas**. O Flutter usa `debugPrint` com informações de rota e de paginação. Esses logs foram úteis durante a investigação de E2EE, mas devem ser removidos ou substituídos por um logger com níveis (`tracing` no Rust) antes de uma distribuição. Esse ponto faz parte da [issue #10 — Revisar segurança e tratamento de erros](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/10).
+Os logs de depuração com `user_id`, `device_id` e conteúdo de mensagens foram removidos. Restam apenas mensagens de erro com `eprintln!` no Rust, sem dados do usuário, e não há logger com níveis nem coleta de diagnóstico.
 
-### Diagnóstico exposto em produção
-
-A rota `/rust-test` e a chamada `checkMatrixBackup()` durante a restauração da sessão existem para diagnóstico e continuam ativas no build de release.
+**Melhoria:** adotar `tracing` no Rust, com nível configurável e sem registrar conteúdo de mensagens.
 
 ## Testes
 
-### Testes Rust dependentes de rede
+### Sem testes da camada Rust nem de integração
 
-Os testes em `rust/src/api/matrix.rs` acessam `https://matrix.org`. O teste `should_login_to_matrix` usa usuário e senha vazios e, portanto, sempre falha. Ele precisa ser marcado com `#[ignore]` ou ler credenciais de variáveis de ambiente.
-
-### Sem testes de integração ou de widget
-
-Os testes cobrem States, Use Cases e ViewModels com repositórios falsos. Não há testes de widget, testes de integração (`integration_test`) nem testes da camada Rust contra um homeserver local.
+Os testes Flutter cobrem States, Use Cases, ViewModels e as telas de login e de mensagens, sempre com repositórios falsos. Não há testes de integração (`integration_test`) nem testes da camada Rust contra um homeserver local (por exemplo, Synapse ou Conduit em Docker).

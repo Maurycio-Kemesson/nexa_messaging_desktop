@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:nexa_messaging_desktop/features/auth/domain/entities/auth_session_entity.dart';
+import 'package:nexa_messaging_desktop/features/auth/presentation/viewmodels/auth_view_model.dart';
 import 'package:nexa_messaging_desktop/features/messages/domain/entities/messages_entity.dart';
 import 'package:nexa_messaging_desktop/features/messages/domain/entities/messages_page_entity.dart';
 import 'package:nexa_messaging_desktop/features/messages/domain/repositories/messages_repository.dart';
@@ -49,9 +51,7 @@ class FakeMessagesRepository implements MessagesRepository {
     if (handler != null) {
       return handler(call);
     }
-    return Future.value(
-      const MessagesPageEntity(messages: [], endToken: null),
-    );
+    return Future.value(const MessagesPageEntity(messages: [], endToken: null));
   }
 
   @override
@@ -78,6 +78,24 @@ class FakeMessagesRepository implements MessagesRepository {
   Future<void> dispose() => updates.close();
 }
 
+AuthSessionEntity _session(String deviceId) => AuthSessionEntity(
+  homeserver: 'https://matrix.org',
+  userId: '@user:matrix.org',
+  deviceId: deviceId,
+  accessToken: 'token-$deviceId',
+);
+
+class FakeSession extends Notifier<AuthSessionEntity?> {
+  @override
+  AuthSessionEntity? build() => _session('FIRST');
+
+  void set(AuthSessionEntity? value) => state = value;
+}
+
+final fakeSessionProvider = NotifierProvider<FakeSession, AuthSessionEntity?>(
+  FakeSession.new,
+);
+
 void main() {
   late FakeMessagesRepository repository;
   late ProviderContainer container;
@@ -85,7 +103,12 @@ void main() {
   setUp(() {
     repository = FakeMessagesRepository();
     container = ProviderContainer.test(
-      overrides: [messagesRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        messagesRepositoryProvider.overrideWithValue(repository),
+        currentSessionProvider.overrideWith(
+          (ref) => ref.watch(fakeSessionProvider),
+        ),
+      ],
     );
   });
 
@@ -94,8 +117,11 @@ void main() {
   MessagesViewModel viewModel() =>
       container.read(messagesViewModelProvider.notifier);
 
-  List<String> messageIds() =>
-      container.read(messagesViewModelProvider).messages.map((m) => m.id).toList();
+  List<String> messageIds() => container
+      .read(messagesViewModelProvider)
+      .messages
+      .map((m) => m.id)
+      .toList();
 
   test('starts with an empty state', () {
     final state = container.read(messagesViewModelProvider);
@@ -160,6 +186,49 @@ void main() {
 
       expect(container.read(messagesViewModelProvider).error, isNull);
     });
+
+    test('ignores a stale response after switching rooms', () async {
+      const otherRoomId = '!other:matrix.org';
+      final staleResponse = Completer<MessagesPageEntity>();
+      repository.onGetMessages = (call) => call.roomId == _roomId
+          ? staleResponse.future
+          : Future.value(
+              MessagesPageEntity(
+                messages: [_message('b', roomId: otherRoomId)],
+                endToken: null,
+              ),
+            );
+
+      final first = viewModel().loadMessages(roomId: _roomId);
+      await viewModel().loadMessages(roomId: otherRoomId);
+
+      staleResponse.complete(
+        MessagesPageEntity(messages: [_message('a')], endToken: null),
+      );
+      await first;
+
+      expect(messageIds(), ['b']);
+    });
+  });
+
+  group('authentication changes', () {
+    test('resets the state when the session changes', () async {
+      repository.onGetMessages = (_) async =>
+          MessagesPageEntity(messages: [_message('1')], endToken: null);
+      await viewModel().loadMessages(roomId: _roomId);
+
+      container.read(fakeSessionProvider.notifier)
+        ..set(null)
+        ..set(_session('SECOND'));
+
+      expect(messageIds(), isEmpty);
+      expect(repository.updates.hasListener, isTrue);
+
+      repository.updates.add(_message('2'));
+      await pumpEventQueue();
+
+      expect(messageIds(), isEmpty);
+    });
   });
 
   group('sendMessage', () {
@@ -217,6 +286,29 @@ void main() {
 
       expect(repository.getMessagesCalls.single.roomId, _roomId);
       expect(messageIds(), ['sent']);
+    });
+
+    test('does not replace the current room after a stale send', () async {
+      const otherRoomId = '!other:matrix.org';
+      repository.sendCompleter = Completer<void>();
+      repository.onGetMessages = (call) async => MessagesPageEntity(
+        messages: [_message('shown', roomId: call.roomId)],
+        endToken: null,
+      );
+
+      final send = viewModel().sendMessage(roomId: _roomId, message: 'Hello');
+      await pumpEventQueue();
+      await viewModel().loadMessages(roomId: otherRoomId);
+
+      repository.sendCompleter!.complete();
+      await send;
+
+      expect(
+        container.read(messagesViewModelProvider).messages.single.roomId,
+        otherRoomId,
+      );
+      expect(messageIds(), ['shown']);
+      expect(container.read(messagesViewModelProvider).isSending, isFalse);
     });
   });
 
@@ -333,10 +425,11 @@ void main() {
       await viewModel().loadMoreMessages();
       await viewModel().loadMoreMessages();
 
-      expect(
-        repository.getMessagesCalls.map((call) => call.fromToken),
-        [null, 't1', 't2'],
-      );
+      expect(repository.getMessagesCalls.map((call) => call.fromToken), [
+        null,
+        't1',
+        't2',
+      ]);
       expect(messageIds(), ['1', '2', '3']);
     });
 

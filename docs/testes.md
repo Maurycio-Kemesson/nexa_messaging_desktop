@@ -1,13 +1,9 @@
 # Testes
 
-O Nexa tem **100 testes unitários** em Flutter, organizados por feature e por camada. Eles validam o comportamento das ViewModels, Use Cases e States sem depender do Rust, do Matrix SDK ou de rede, e rodam em poucos segundos.
+O Nexa tem testes Flutter organizados por feature e por camada. Eles validam ViewModels, Use Cases, States e as telas de login e de mensagens sem depender do Rust, do Matrix SDK ou de rede.
 
 ```bash
 flutter test
-```
-
-```text
-00:02 +100: All tests passed!
 ```
 
 ## Estratégia
@@ -19,38 +15,32 @@ A arquitetura MVVM ([ADR 002](adr/002-arquitetura-mvvm.md)) concentra a lógica 
 | State | Sim | Teste direto da classe imutável: valores padrão, `copyWith` e propriedades derivadas. |
 | Use Case | Sim | Instanciado com um Repository falso, verificando a delegação e os argumentos. |
 | ViewModel | Sim | Criada por um `ProviderContainer` com o Repository falso injetado, verificando as transições de estado. |
+| Views / Widgets | Parcial | `AuthContent` e `MessagesView` com Repositories falsos, cobrindo login, envio e atualização em tempo real. |
 | Repository (implementação) | Não | Depende da biblioteca nativa carregada pelo `RustLib.init()`. |
-| Rust (`rust/src/api`) | Parcial | Testes de integração contra o `matrix.org` (ver [abaixo](#testes-rust)). |
-| Views / Widgets | Não | Ver [Limitações](limitacoes.md#sem-testes-de-integração-ou-de-widget). |
+| Rust (`rust/src/api`) | Não | Ver [Limitações](limitacoes.md#sem-testes-da-camada-rust-nem-de-integração). |
 
 Como as ViewModels dependem apenas dos contratos de Repository (`domain/repositories/`), basta substituir o Repository por uma implementação falsa para testar toda a lógica de apresentação de forma determinística.
 
 ## Estrutura
 
-Os testes espelham a estrutura de `lib/features/`. Cada feature tem três arquivos, um por camada:
+Os testes espelham a estrutura de `lib/features/`:
 
 ```text
 test/features/
 ├── auth/
 │   ├── auth_state_test.dart
 │   ├── auth_usecase_test.dart
-│   └── auth_view_model_test.dart
+│   ├── auth_view_model_test.dart
+│   └── auth_content_test.dart
 ├── home/
 ├── messages/
+│   ├── ...
+│   └── messages_view_test.dart
 ├── recovery/
-├── rooms/
-└── rust_test/
+└── rooms/
 ```
 
-| Feature | State | Use Case | ViewModel | Total |
-| --- | --- | --- | --- | --- |
-| `auth` | 4 | 3 | 12 | 19 |
-| `home` | 3 | 1 | 5 | 9 |
-| `messages` | 8 | 3 | 22 | 33 |
-| `recovery` | 3 | 1 | 6 | 10 |
-| `rooms` | 8 | 1 | 9 | 18 |
-| `rust_test` | 3 | 2 | 6 | 11 |
-| **Total** | **29** | **11** | **60** | **100** |
+Cada feature tem testes de State, Use Case e ViewModel. `auth` e `messages` também têm testes de widget.
 
 ## O que é verificado
 
@@ -80,11 +70,16 @@ Comportamentos específicos de cada feature:
 
 | Feature | Cenários |
 | --- | --- |
-| `auth` | Restauração da sessão no `build` (com sessão, sem sessão e com falha); login com sucesso e falha; logout com sucesso e falha mantendo a sessão; `isAuthenticatedProvider` acompanhando login e logout. |
+| `auth` | Restauração da sessão no `build` (com sessão, sem sessão e com falha); login com sucesso e falha; logout que sempre encerra a sessão local, mesmo quando o servidor falha; `isAuthenticatedProvider` acompanhando login e logout. |
 | `rooms` | Carregamento da lista, lista vazia, seleção e troca de sala, sala selecionada preservada após recarregar. |
-| `messages` | Primeira página do histórico; envio ignorando mensagem vazia e removendo espaços; recarga do histórico após enviar; atualização em tempo real somente da sala atual, sem duplicatas e com propagação de erros do stream; cancelamento da assinatura ao descartar a ViewModel; paginação com `endToken` até o fim do histórico, bloqueio de chamadas concorrentes e nova tentativa após falha. |
+| `messages` | Primeira página do histórico; resposta atrasada ignorada ao trocar de sala; envio ignorando mensagem vazia e removendo espaços; recarga do histórico após enviar; envio atrasado que não substitui a sala atual; atualização em tempo real somente da sala atual, sem duplicatas e com propagação de erros do stream; cancelamento da assinatura ao descartar a ViewModel; paginação com `endToken` até o fim do histórico, bloqueio de chamadas concorrentes e nova tentativa após falha. |
 | `recovery` | Repasse da Recovery Key, marcação de sucesso e reinício do sucesso quando uma nova tentativa falha. |
-| `home` / `rust_test` | Execução do Use Case e tratamento de carregamento e erro. |
+| `home` | Execução do Use Case e tratamento de carregamento e erro. |
+
+### Widgets
+
+* `AuthContent`: envio do formulário com usuário recortado e senha intacta; exibição do erro quando o login falha.
+* `MessagesView`: estado vazio, histórico, mensagem em tempo real, compositor limpo após envio e texto preservado quando o envio falha.
 
 ## Como os testes são montados
 
@@ -165,17 +160,4 @@ test('sets isLoading while the request is pending', () async {
 
 ## Testes Rust
 
-Os testes Rust ficam em `rust/src/api/matrix.rs` e são executados com:
-
-```bash
-cd rust
-cargo test
-```
-
-| Teste | O que verifica |
-| --- | --- |
-| `should_create_matrix_client` | Criação de um `Client` apontando para `https://matrix.org`. |
-| `should_get_matrix_login_types` | Consulta dos tipos de login suportados pelo homeserver. |
-| `should_login_to_matrix` | Login com usuário e senha. |
-
-Esses testes acessam a rede, e o `should_login_to_matrix` exige credenciais reais (hoje estão vazias no código, então ele falha). Por isso eles não fazem parte da verificação obrigatória antes de cada PR. Os detalhes estão em [Limitações](limitacoes.md#testes-rust-dependentes-de-rede).
+Não há testes Rust no crate. A verificação obrigatória antes de cada PR é `dart format .`, `flutter analyze` e `flutter test`. Detalhes em [Limitações](limitacoes.md#sem-testes-da-camada-rust-nem-de-integração).
