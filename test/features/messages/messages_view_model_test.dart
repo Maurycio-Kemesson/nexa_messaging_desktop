@@ -9,24 +9,49 @@ import 'package:nexa_messaging_desktop/features/messages/domain/repositories/mes
 import 'package:nexa_messaging_desktop/features/messages/presentation/messages_providers.dart';
 import 'package:nexa_messaging_desktop/features/messages/presentation/viewmodels/messages_view_model.dart';
 
-class FakeMessagesRepository implements MessagesRepository {
-  bool sendMessageCalled = false;
-  bool getMessagesCalled = false;
-  bool shouldThrowOnSend = false;
+const _roomId = '!room:matrix.org';
 
+MessageEntity _message(String id, {String roomId = _roomId}) {
+  return MessageEntity(
+    id: id,
+    roomId: roomId,
+    sender: '@user:matrix.org',
+    content: 'content $id',
+    timestamp: DateTime(2026, 1, 1),
+  );
+}
+
+typedef GetMessagesCall = ({String roomId, String? fromToken});
+
+class FakeMessagesRepository implements MessagesRepository {
+  final StreamController<MessageEntity> updates =
+      StreamController<MessageEntity>.broadcast();
+
+  final List<GetMessagesCall> getMessagesCalls = [];
+
+  Future<MessagesPageEntity> Function(GetMessagesCall call)? onGetMessages;
+
+  bool sendMessageCalled = false;
+  bool shouldThrowOnSend = false;
   String? sentRoomId;
   String? sentMessage;
-
   Completer<void>? sendCompleter;
 
   @override
   Future<MessagesPageEntity> getMessages({
     required String roomId,
     String? fromToken,
-  }) async {
-    getMessagesCalled = true;
+  }) {
+    final call = (roomId: roomId, fromToken: fromToken);
+    getMessagesCalls.add(call);
 
-    return const MessagesPageEntity(messages: [], endToken: null);
+    final handler = onGetMessages;
+    if (handler != null) {
+      return handler(call);
+    }
+    return Future.value(
+      const MessagesPageEntity(messages: [], endToken: null),
+    );
   }
 
   @override
@@ -48,115 +73,320 @@ class FakeMessagesRepository implements MessagesRepository {
   }
 
   @override
-  Stream<MessageEntity> watchMessages() {
-    return const Stream.empty();
-  }
+  Stream<MessageEntity> watchMessages() => updates.stream;
+
+  Future<void> dispose() => updates.close();
 }
 
 void main() {
-  test('Should not send an empty message', () async {
-    final repository = FakeMessagesRepository();
+  late FakeMessagesRepository repository;
+  late ProviderContainer container;
 
-    final container = ProviderContainer(
+  setUp(() {
+    repository = FakeMessagesRepository();
+    container = ProviderContainer.test(
       overrides: [messagesRepositoryProvider.overrideWithValue(repository)],
     );
-
-    addTearDown(container.dispose);
-
-    final viewModel = container.read(messagesViewModelProvider.notifier);
-
-    await viewModel.sendMessage(roomId: '!room:matrix.org', message: '   ');
-
-    expect(repository.sendMessageCalled, isFalse);
   });
 
-  test('Should send a valid message', () async {
-    final repository = FakeMessagesRepository();
+  tearDown(() => repository.dispose());
 
-    final container = ProviderContainer(
-      overrides: [messagesRepositoryProvider.overrideWithValue(repository)],
-    );
+  MessagesViewModel viewModel() =>
+      container.read(messagesViewModelProvider.notifier);
 
-    addTearDown(container.dispose);
+  List<String> messageIds() =>
+      container.read(messagesViewModelProvider).messages.map((m) => m.id).toList();
 
-    final viewModel = container.read(messagesViewModelProvider.notifier);
+  test('starts with an empty state', () {
+    final state = container.read(messagesViewModelProvider);
 
-    await viewModel.sendMessage(
-      roomId: '!room:matrix.org',
-      message: 'Hello Matrix!',
-    );
-
-    expect(repository.sendMessageCalled, isTrue);
-    expect(repository.sentRoomId, '!room:matrix.org');
-    expect(repository.sentMessage, 'Hello Matrix!');
+    expect(state.isLoading, isFalse);
+    expect(state.isSending, isFalse);
+    expect(state.messages, isEmpty);
+    expect(state.error, isNull);
+    expect(state.isEmpty, isTrue);
   });
 
-  test('Should set isSending while sending a message', () async {
-    final repository = FakeMessagesRepository()
-      ..sendCompleter = Completer<void>();
+  group('loadMessages', () {
+    test('loads the first page of the room', () async {
+      repository.onGetMessages = (_) async => MessagesPageEntity(
+        messages: [_message('1'), _message('2')],
+        endToken: 'token-1',
+      );
 
-    final container = ProviderContainer(
-      overrides: [messagesRepositoryProvider.overrideWithValue(repository)],
-    );
+      await viewModel().loadMessages(roomId: _roomId);
 
-    addTearDown(container.dispose);
+      final state = container.read(messagesViewModelProvider);
+      expect(state.isLoading, isFalse);
+      expect(state.error, isNull);
+      expect(messageIds(), ['1', '2']);
+      expect(repository.getMessagesCalls.single.roomId, _roomId);
+      expect(repository.getMessagesCalls.single.fromToken, isNull);
+    });
 
-    final viewModel = container.read(messagesViewModelProvider.notifier);
+    test('sets isLoading while the request is pending', () async {
+      final completer = Completer<MessagesPageEntity>();
+      repository.onGetMessages = (_) => completer.future;
 
-    final future = viewModel.sendMessage(
-      roomId: '!room:matrix.org',
-      message: 'Hello Matrix!',
-    );
+      final future = viewModel().loadMessages(roomId: _roomId);
 
-    await Future<void>.delayed(Duration.zero);
+      expect(container.read(messagesViewModelProvider).isLoading, isTrue);
 
-    expect(viewModel.state.isSending, isTrue);
+      completer.complete(
+        const MessagesPageEntity(messages: [], endToken: null),
+      );
+      await future;
 
-    repository.sendCompleter!.complete();
+      expect(container.read(messagesViewModelProvider).isLoading, isFalse);
+    });
 
-    await future;
+    test('exposes the error on failure', () async {
+      repository.onGetMessages = (_) async => throw Exception('network');
 
-    expect(viewModel.state.isSending, isFalse);
+      await viewModel().loadMessages(roomId: _roomId);
+
+      final state = container.read(messagesViewModelProvider);
+      expect(state.isLoading, isFalse);
+      expect(state.error, 'Exception: network');
+      expect(state.isEmpty, isFalse);
+    });
+
+    test('clears a previous error when retrying', () async {
+      repository.onGetMessages = (_) async => throw Exception('network');
+      await viewModel().loadMessages(roomId: _roomId);
+
+      repository.onGetMessages = null;
+      await viewModel().loadMessages(roomId: _roomId);
+
+      expect(container.read(messagesViewModelProvider).error, isNull);
+    });
   });
 
-  test('Should handle send message error', () async {
-    final repository = FakeMessagesRepository()..shouldThrowOnSend = true;
+  group('sendMessage', () {
+    test('does not send an empty message', () async {
+      await viewModel().sendMessage(roomId: _roomId, message: '   ');
 
-    final container = ProviderContainer(
-      overrides: [messagesRepositoryProvider.overrideWithValue(repository)],
-    );
+      expect(repository.sendMessageCalled, isFalse);
+      expect(container.read(messagesViewModelProvider).isSending, isFalse);
+    });
 
-    addTearDown(container.dispose);
+    test('sends a trimmed message', () async {
+      await viewModel().sendMessage(
+        roomId: _roomId,
+        message: '  Hello Matrix!  ',
+      );
 
-    final viewModel = container.read(messagesViewModelProvider.notifier);
+      expect(repository.sendMessageCalled, isTrue);
+      expect(repository.sentRoomId, _roomId);
+      expect(repository.sentMessage, 'Hello Matrix!');
+    });
 
-    await viewModel.sendMessage(
-      roomId: '!room:matrix.org',
-      message: 'Hello Matrix!',
-    );
+    test('sets isSending while sending a message', () async {
+      repository.sendCompleter = Completer<void>();
 
-    expect(viewModel.state.isSending, isFalse);
+      final future = viewModel().sendMessage(
+        roomId: _roomId,
+        message: 'Hello Matrix!',
+      );
+      await pumpEventQueue();
 
-    expect(viewModel.state.error, 'Exception: Failed to send message');
+      expect(container.read(messagesViewModelProvider).isSending, isTrue);
+
+      repository.sendCompleter!.complete();
+      await future;
+
+      expect(container.read(messagesViewModelProvider).isSending, isFalse);
+    });
+
+    test('exposes the error on failure', () async {
+      repository.shouldThrowOnSend = true;
+
+      await viewModel().sendMessage(roomId: _roomId, message: 'Hello Matrix!');
+
+      final state = container.read(messagesViewModelProvider);
+      expect(state.isSending, isFalse);
+      expect(state.error, 'Exception: Failed to send message');
+      expect(repository.getMessagesCalls, isEmpty);
+    });
+
+    test('reloads the room messages after sending', () async {
+      repository.onGetMessages = (_) async =>
+          MessagesPageEntity(messages: [_message('sent')], endToken: null);
+
+      await viewModel().sendMessage(roomId: _roomId, message: 'Hello Matrix!');
+
+      expect(repository.getMessagesCalls.single.roomId, _roomId);
+      expect(messageIds(), ['sent']);
+    });
   });
 
-  test('Should reload messages after sending', () async {
-    final repository = FakeMessagesRepository();
+  group('real-time updates', () {
+    setUp(() {
+      repository.onGetMessages = (_) async =>
+          MessagesPageEntity(messages: [_message('1')], endToken: null);
+    });
 
-    final container = ProviderContainer(
-      overrides: [messagesRepositoryProvider.overrideWithValue(repository)],
-    );
+    test('appends messages received for the current room', () async {
+      await viewModel().loadMessages(roomId: _roomId);
 
-    addTearDown(container.dispose);
+      repository.updates.add(_message('2'));
+      await pumpEventQueue();
 
-    final viewModel = container.read(messagesViewModelProvider.notifier);
+      expect(messageIds(), ['1', '2']);
+    });
 
-    await viewModel.sendMessage(
-      roomId: '!room:matrix.org',
-      message: 'Hello Matrix!',
-    );
+    test('ignores messages from other rooms', () async {
+      await viewModel().loadMessages(roomId: _roomId);
 
-    expect(repository.sendMessageCalled, isTrue);
-    expect(repository.getMessagesCalled, isTrue);
+      repository.updates.add(_message('2', roomId: '!other:matrix.org'));
+      await pumpEventQueue();
+
+      expect(messageIds(), ['1']);
+    });
+
+    test('ignores messages before a room is loaded', () async {
+      viewModel();
+
+      repository.updates.add(_message('2'));
+      await pumpEventQueue();
+
+      expect(messageIds(), isEmpty);
+    });
+
+    test('ignores duplicated messages', () async {
+      await viewModel().loadMessages(roomId: _roomId);
+
+      repository.updates
+        ..add(_message('1'))
+        ..add(_message('2'))
+        ..add(_message('2'));
+      await pumpEventQueue();
+
+      expect(messageIds(), ['1', '2']);
+    });
+
+    test('exposes stream errors', () async {
+      await viewModel().loadMessages(roomId: _roomId);
+
+      repository.updates.addError(Exception('sync failed'));
+      await pumpEventQueue();
+
+      final state = container.read(messagesViewModelProvider);
+      expect(state.error, 'Exception: sync failed');
+      expect(messageIds(), ['1']);
+    });
+
+    test('cancels the subscription when disposed', () {
+      viewModel();
+      expect(repository.updates.hasListener, isTrue);
+
+      container.dispose();
+
+      expect(repository.updates.hasListener, isFalse);
+    });
+  });
+
+  group('loadMoreMessages', () {
+    test('does nothing before a room is loaded', () async {
+      await viewModel().loadMoreMessages();
+
+      expect(repository.getMessagesCalls, isEmpty);
+    });
+
+    test('does nothing when there is no older history', () async {
+      await viewModel().loadMessages(roomId: _roomId);
+
+      await viewModel().loadMoreMessages();
+
+      expect(repository.getMessagesCalls, hasLength(1));
+    });
+
+    test('prepends older messages using the history token', () async {
+      repository.onGetMessages = (call) async => call.fromToken == null
+          ? MessagesPageEntity(
+              messages: [_message('3'), _message('4')],
+              endToken: 'token-1',
+            )
+          : MessagesPageEntity(
+              messages: [_message('1'), _message('2'), _message('3')],
+              endToken: null,
+            );
+
+      await viewModel().loadMessages(roomId: _roomId);
+      await viewModel().loadMoreMessages();
+
+      expect(repository.getMessagesCalls.last.roomId, _roomId);
+      expect(repository.getMessagesCalls.last.fromToken, 'token-1');
+      expect(messageIds(), ['1', '2', '3', '4']);
+    });
+
+    test('follows the next token until history ends', () async {
+      final pages = {
+        null: MessagesPageEntity(messages: [_message('3')], endToken: 't1'),
+        't1': MessagesPageEntity(messages: [_message('2')], endToken: 't2'),
+        't2': MessagesPageEntity(messages: [_message('1')], endToken: null),
+      };
+      repository.onGetMessages = (call) async => pages[call.fromToken]!;
+
+      await viewModel().loadMessages(roomId: _roomId);
+      await viewModel().loadMoreMessages();
+      await viewModel().loadMoreMessages();
+      await viewModel().loadMoreMessages();
+
+      expect(
+        repository.getMessagesCalls.map((call) => call.fromToken),
+        [null, 't1', 't2'],
+      );
+      expect(messageIds(), ['1', '2', '3']);
+    });
+
+    test('ignores concurrent calls while loading', () async {
+      final olderPage = Completer<MessagesPageEntity>();
+      repository.onGetMessages = (call) => call.fromToken == null
+          ? Future.value(
+              MessagesPageEntity(messages: [_message('2')], endToken: 't1'),
+            )
+          : olderPage.future;
+
+      await viewModel().loadMessages(roomId: _roomId);
+
+      final first = viewModel().loadMoreMessages();
+      await viewModel().loadMoreMessages();
+
+      olderPage.complete(
+        MessagesPageEntity(messages: [_message('1')], endToken: null),
+      );
+      await first;
+
+      expect(repository.getMessagesCalls, hasLength(2));
+      expect(messageIds(), ['1', '2']);
+    });
+
+    test('keeps messages, exposes the error and allows retry', () async {
+      var failOlderPage = true;
+      repository.onGetMessages = (call) async {
+        if (call.fromToken == null) {
+          return MessagesPageEntity(messages: [_message('2')], endToken: 't1');
+        }
+        if (failOlderPage) {
+          throw Exception('history failed');
+        }
+        return MessagesPageEntity(messages: [_message('1')], endToken: null);
+      };
+
+      await viewModel().loadMessages(roomId: _roomId);
+      await viewModel().loadMoreMessages();
+
+      expect(
+        container.read(messagesViewModelProvider).error,
+        'Exception: history failed',
+      );
+      expect(messageIds(), ['2']);
+
+      failOlderPage = false;
+      await viewModel().loadMoreMessages();
+
+      expect(messageIds(), ['1', '2']);
+    });
   });
 }
