@@ -14,6 +14,30 @@ struct _MyApplication {
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
+static void set_window_icon(GtkWindow* window) {
+  g_autofree gchar* exe = g_file_read_link("/proc/self/exe", nullptr);
+  if (exe == nullptr) {
+    return;
+  }
+
+  g_autofree gchar* dir = g_path_get_dirname(exe);
+  const gchar* candidates[] = {
+      "data/flutter_assets/assets/app_icon.png",
+      "nexa_messaging_desktop.png",
+      nullptr,
+  };
+
+  for (int i = 0; candidates[i] != nullptr; ++i) {
+    g_autofree gchar* icon_path =
+        g_build_filename(dir, candidates[i], nullptr);
+    if (g_file_test(icon_path, G_FILE_TEST_EXISTS)) {
+      gtk_window_set_icon_from_file(window, icon_path, nullptr);
+      gtk_window_set_default_icon_from_file(icon_path, nullptr);
+      return;
+    }
+  }
+}
+
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
@@ -45,11 +69,11 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "nexa_messaging_desktop");
+    gtk_header_bar_set_title(header_bar, "Nexa Messaging");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "nexa_messaging_desktop");
+    gtk_window_set_title(window, "Nexa Messaging");
   }
 
   gtk_window_set_default_size(window, 1280, 720);
@@ -62,10 +86,11 @@ static void my_application_activate(GApplication* application) {
   GdkRGBA background_color;
   // Background defaults to black, override it here if necessary, e.g. #00000000
   // for transparent.
-  gdk_rgba_parse(&background_color, "#000000");
+  gdk_rgba_parse(&background_color, "#011c26");
   fl_view_set_background_color(view, &background_color);
   gtk_widget_show(GTK_WIDGET(view));
   gtk_container_add(GTK_CONTAINER(window), GTK_WIDGET(view));
+  set_window_icon(window);
 
   // Show the window when Flutter renders.
   // Requires the view to be realized so we can start rendering.

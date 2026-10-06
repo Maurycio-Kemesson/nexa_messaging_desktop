@@ -8,7 +8,6 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import '../frb_generated.dart';
 
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
-// These functions are ignored (category: IgnoreBecauseExplicitAttribute): `create_matrix_client`, `get_matrix_login_types`, `login_matrix`
 
 class AuthSession {
   final String userId;

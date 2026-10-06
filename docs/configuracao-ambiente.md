@@ -153,16 +153,7 @@ flutter analyze
 flutter test
 ```
 
-Os 100 testes Flutter (`test/features/`) cobrem States, Use Cases e ViewModels de cada feature, utilizando implementações falsas dos repositórios. Eles não dependem do Rust nem de rede. A estratégia completa está em [Testes](testes.md).
-
-Os testes Rust ficam em `rust/src/api/matrix.rs`:
-
-```bash
-cd rust
-cargo test
-```
-
-Esses testes acessam o `https://matrix.org` e, portanto, dependem de rede. O teste `should_login_to_matrix` exige credenciais reais e falha com os valores vazios presentes no código. Veja [Limitações](limitacoes.md#testes-rust-dependentes-de-rede).
+Os testes Flutter (`test/features/`) cobrem States, Use Cases, ViewModels e as telas de login e de mensagens, utilizando implementações falsas dos repositórios. Eles não dependem do Rust nem de rede. A estratégia completa está em [Testes](testes.md).
 
 ## Gerando novas features
 
@@ -183,4 +174,4 @@ mason make feature --name nome_da_feature
 | Erro do `flutter_secure_storage` no Linux | Keyring indisponível ou `libsecret` ausente | Instalar `libsecret-1-dev` e garantir um keyring ativo. |
 | `CMakeCache.txt directory ... is different` no Windows | Build anterior feito a partir de outro caminho | Compilar pelo mesmo caminho ou apagar `build\windows`. |
 | Erros de caminho muito longo ao compilar o Rust no Windows | Limite de 260 caracteres em pastas profundas | Usar `subst` para uma unidade curta. Ver [Distribuição para Windows](distribuicao-windows.md#caminhos-longos). |
-| Falha de conexão com o homeserver no macOS | Sandbox sem `com.apple.security.network.client` | Ver [Limitações](limitacoes.md#macos-sem-permissão-de-rede-de-saída). |
+| Falha de conexão com o homeserver no macOS | Sandbox sem `com.apple.security.network.client` | A chave já está nas entitlements de Debug e Release. Se o problema persistir, ver [Limitações](limitacoes.md#macos-sem-validação-de-ponta-a-ponta). |

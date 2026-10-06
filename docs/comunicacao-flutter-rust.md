@@ -29,14 +29,12 @@ rust_builder/ (Cargokit)             compila o crate e empacota a biblioteca nat
 | `login_matrix` | `loginMatrix` | `Future<AuthSession>` | `AuthRepositoryImpl.login` |
 | `restore_matrix_session` | `restoreMatrixSession` | `Future<void>` | `AuthRepositoryImpl.getSession` |
 | `start_matrix_sync` | `startMatrixSync` | `Future<void>` | `AuthRepositoryImpl` (após login e restauração) |
-| `check_matrix_backup` | `checkMatrixBackup` | `Future<String>` | `AuthRepositoryImpl.getSession` (diagnóstico) |
+| `logout_matrix` | `logoutMatrix` | `Future<void>` | `AuthRepositoryImpl.logout` |
 | `recover_matrix_encryption` | `recoverMatrixEncryption` | `Future<void>` | `RecoveryRepositoryImpl` |
 | `get_rooms` | `getRooms` | `Future<List<RoomSummary>>` | `RoomsRepositoryImpl` |
 | `get_messages` | `getMessages` | `Future<MessagesPage>` | `MessagesRepositoryImpl` |
 | `send_message` | `sendMessage` | `Future<void>` | `MessagesRepositoryImpl` |
 | `subscribe_to_messages` | `subscribeToMessages` | `Stream<MessageSummary>` | `MessagesRepositoryImpl.watchMessages` |
-| `connect_matrix` | `connectMatrix` | `Future<String>` | `RustTestRepositoryImpl` (diagnóstico) |
-| `greet` | `greet` | `String` (síncrona) | `RustTestRepositoryImpl` (diagnóstico) |
 
 Funções auxiliares internas são marcadas com `#[flutter_rust_bridge::frb(ignore)]` ou não são `pub`, e por isso não aparecem no Dart (por exemplo `get_authenticated_client`, `matrix_message_sender` e `matrix_store_path`).
 
@@ -72,7 +70,7 @@ final List<rust_api.RoomSummary> rooms = await rust_api.getRooms();
 
 ### Síncrona
 
-Com `#[frb(sync)]`, a chamada é executada diretamente na thread do Dart e retorna o valor sem `Future`. O projeto usa esse modo apenas em `greet`, porque uma chamada síncrona demorada travaria a interface.
+Com `#[frb(sync)]`, a chamada é executada diretamente na thread do Dart e retorna o valor sem `Future`. O Nexa não usa esse modo: as operações com o Matrix são assíncronas para não bloquear a interface.
 
 ### Streams (Rust → Dart)
 
@@ -130,7 +128,7 @@ O uso de `String` como tipo de erro simplifica a fronteira, mas impede que o Flu
 
 * O FRB executa as funções `async` em um runtime Tokio multi-thread. Por isso o cliente Matrix global fica em um `Mutex`, e o lock é mantido apenas para clonar ou substituir o `Client`, nunca durante um `await`.
 * O sync contínuo (`client.sync()`) roda em uma `std::thread` dedicada, com um runtime Tokio `current_thread` próprio. Assim o loop de longa duração não ocupa as threads usadas pelas demais chamadas do Flutter.
-* O `AtomicBool` `MATRIX_SYNC_STARTED` garante uma única thread de sync. Se o sync terminar com erro, a flag volta a `false` e uma nova chamada de `startMatrixSync` pode reiniciá-lo.
+* O handle em `MATRIX_SYNC` garante uma única thread de sync. `logout_matrix` envia um sinal de encerramento e espera a thread terminar antes de descartar o `Client`.
 
 ## Adicionando uma nova função
 

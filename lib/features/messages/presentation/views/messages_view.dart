@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nexa_messaging_desktop/core/theme/app_colors.dart';
+import 'package:nexa_messaging_desktop/core/widgets/nexa_logo.dart';
 
 import '../viewmodels/messages_view_model.dart';
-
 import '../widgets/messages_content.dart';
 
 class MessagesView extends ConsumerStatefulWidget {
@@ -37,21 +38,45 @@ class _MessagesViewState extends ConsumerState<MessagesView> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          child: Text(
-            widget.roomName,
-            style: Theme.of(context).textTheme.titleLarge,
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return ColoredBox(
+      color: AppColors.navy,
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+            decoration: const BoxDecoration(
+              color: AppColors.navyLight,
+              border: Border(bottom: BorderSide(color: AppColors.divider)),
+            ),
+            child: Row(
+              children: [
+                const NexaLogo(height: 28),
+                const SizedBox(width: 16),
+                Container(width: 1, height: 28, color: AppColors.divider),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.roomName, style: textTheme.titleLarge),
+                      const SizedBox(height: 2),
+                      Text('Sala', style: textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-        const Divider(height: 1),
-        const Expanded(child: MessagesContent()),
-        const Divider(height: 1),
-        _MessageComposer(controller: _messageController, roomId: widget.roomId),
-      ],
+          const Expanded(child: MessagesContent()),
+          _MessageComposer(
+            controller: _messageController,
+            roomId: widget.roomId,
+          ),
+        ],
+      ),
     );
   }
 }
@@ -68,55 +93,68 @@ class _MessageComposer extends ConsumerWidget {
       messagesViewModelProvider.select((state) => state.isSending),
     );
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
+    Future<void> send() async {
+      if (isSending) {
+        return;
+      }
+
+      final MessagesViewModel viewModel = ref.read(
+        messagesViewModelProvider.notifier,
+      );
+
+      final String message = controller.text;
+
+      await viewModel.sendMessage(roomId: roomId, message: message);
+
+      if (!context.mounted) {
+        return;
+      }
+
+      final bool hasError = ref.read(
+        messagesViewModelProvider.select((state) => state.error != null),
+      );
+
+      if (!hasError) {
+        controller.clear();
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+      decoration: const BoxDecoration(
+        color: AppColors.navyLight,
+        border: Border(top: BorderSide(color: AppColors.divider)),
+      ),
       child: Row(
         children: [
           Expanded(
             child: TextField(
               controller: controller,
               enabled: !isSending,
+              textInputAction: TextInputAction.send,
+              onSubmitted: (_) => send(),
               decoration: const InputDecoration(
                 hintText: 'Digite uma mensagem...',
-                border: OutlineInputBorder(),
               ),
             ),
           ),
           const SizedBox(width: 8),
           IconButton(
-            onPressed: isSending
-                ? null
-                : () async {
-                    final MessagesViewModel viewModel = ref.read(
-                      messagesViewModelProvider.notifier,
-                    );
-
-                    final String message = controller.text;
-
-                    await viewModel.sendMessage(
-                      roomId: roomId,
-                      message: message,
-                    );
-
-                    if (!context.mounted) {
-                      return;
-                    }
-
-                    final bool hasError = ref.read(
-                      messagesViewModelProvider.select(
-                        (state) => state.error != null,
-                      ),
-                    );
-
-                    if (!hasError) {
-                      controller.clear();
-                    }
-                  },
+            onPressed: isSending ? null : send,
+            style: IconButton.styleFrom(
+              backgroundColor: AppColors.lime,
+              foregroundColor: AppColors.navy,
+              disabledBackgroundColor: AppColors.navyElevated,
+              minimumSize: const Size(44, 44),
+            ),
             icon: isSending
                 ? const SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.navy,
+                    ),
                   )
                 : const Icon(Icons.send),
           ),

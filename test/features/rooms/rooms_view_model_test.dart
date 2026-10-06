@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:nexa_messaging_desktop/features/auth/presentation/viewmodels/auth_view_model.dart';
 import 'package:nexa_messaging_desktop/features/rooms/domain/entities/rooms_entity.dart';
 import 'package:nexa_messaging_desktop/features/rooms/domain/repositories/rooms_repository.dart';
 import 'package:nexa_messaging_desktop/features/rooms/presentation/rooms_providers.dart';
@@ -37,7 +38,10 @@ void main() {
   setUp(() {
     repository = FakeRoomsRepository();
     container = ProviderContainer.test(
-      overrides: [roomsRepositoryProvider.overrideWithValue(repository)],
+      overrides: [
+        roomsRepositoryProvider.overrideWithValue(repository),
+        currentSessionProvider.overrideWithValue(null),
+      ],
     );
   });
 

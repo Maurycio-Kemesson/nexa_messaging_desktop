@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nexa_messaging_desktop/features/auth/presentation/viewmodels/auth_view_model.dart';
 import 'package:nexa_messaging_desktop/features/rooms/domain/entities/rooms_entity.dart';
 
 import '../../domain/usecases/rooms_usecase.dart';
@@ -9,11 +10,11 @@ final NotifierProvider<RoomsViewModel, RoomsState> roomsViewModelProvider =
     NotifierProvider<RoomsViewModel, RoomsState>(RoomsViewModel.new);
 
 class RoomsViewModel extends Notifier<RoomsState> {
-  late final RoomsUseCase _roomsUseCase;
+  RoomsUseCase get _roomsUseCase => ref.read(roomsUseCaseProvider);
 
   @override
   RoomsState build() {
-    _roomsUseCase = ref.read(roomsUseCaseProvider);
+    ref.watch(currentSessionProvider);
 
     return const RoomsState();
   }

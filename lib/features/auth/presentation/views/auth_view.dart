@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../widgets/auth_content.dart';
 
 class AuthView extends StatelessWidget {
@@ -7,11 +8,25 @@ class AuthView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
+      backgroundColor: AppColors.navy,
       body: Center(
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(32),
-          child: SizedBox(width: 420, child: AuthContent()),
+          padding: const EdgeInsets.all(32),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppColors.navyLight,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 32, vertical: 40),
+                child: AuthContent(),
+              ),
+            ),
+          ),
         ),
       ),
     );

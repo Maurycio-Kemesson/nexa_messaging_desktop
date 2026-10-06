@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Nexa Messaging
+Comment=Cliente desktop Nexa Messaging
+Exec=nexa_messaging_desktop
+Icon=nexa_messaging_desktop
+Terminal=false
+Categories=Network;InstantMessaging;Chat;
+StartupWMClass=com.example.nexa_messaging_desktop
