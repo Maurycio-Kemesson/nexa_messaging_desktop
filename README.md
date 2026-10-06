@@ -8,6 +8,7 @@ Cliente de mensageria desktop multiplataforma desenvolvido com **Flutter**, **Ru
 ## Sumário
 
 * [Sobre o projeto](#sobre-o-projeto)
+* [Capturas de tela](#capturas-de-tela)
 * [Plataformas suportadas](#plataformas-suportadas)
 * [Download (Windows)](#download-windows)
 * [Início rápido](#início-rápido)
@@ -29,6 +30,26 @@ O **Nexa** é um cliente de mensageria desktop desenvolvido como parte de um des
 | Flutter Rust Bridge | 2.13.0 |
 | Matrix Rust SDK | 0.19.1 |
 | Riverpod / go_router | 3.3 / 17.5 |
+
+## Capturas de tela
+
+Login no homeserver, lista de conversas, histórico de mensagens e recuperação das chaves E2EE.
+
+![Login no homeserver Matrix](assets/captures/login.png)
+
+*Login: homeserver, usuário e senha.*
+
+![Lista de conversas](assets/captures/home.png)
+
+*Home: salas à esquerda e painel pedindo para selecionar uma conversa.*
+
+![Histórico e envio de mensagens](assets/captures/captura.png)
+
+*Mensagens: histórico da sala, envio e compositor de texto.*
+
+![Recuperação das chaves E2EE](assets/captures/recuperacao.png)
+
+*Recuperação E2EE: informa a Recovery Key para restaurar as chaves de criptografia.*
 
 ## Plataformas suportadas
 
