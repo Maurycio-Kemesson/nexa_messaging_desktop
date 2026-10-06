@@ -3,160 +3,78 @@
 Cliente de mensageria desktop multiplataforma desenvolvido com **Flutter**, **Rust**, **Matrix Rust SDK** e **Flutter Rust Bridge**.
 
 **Repositório:** [github.com/Maurycio-Kemesson/nexa_messaging_desktop](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop)
+**Quadro do projeto:** [GitHub Projects — Nexa Messaging Desktop](https://github.com/users/Maurycio-Kemesson/projects/3)
+
+## Sumário
+
+* [Sobre o projeto](#sobre-o-projeto)
+* [Plataformas suportadas](#plataformas-suportadas)
+* [Download (Windows)](#download-windows)
+* [Início rápido](#início-rápido)
+* [Arquitetura em resumo](#arquitetura-em-resumo)
+* [Funcionalidades](#funcionalidades)
+* [Testes](#testes)
+* [Documentação completa](#documentação-completa)
+* [Status do projeto](#status-do-projeto)
+* [Licença](#licença)
 
 ## Sobre o projeto
 
-O **Nexa** é um cliente de mensageria desktop desenvolvido como parte de um desafio técnico.
+O **Nexa** é um cliente de mensageria desktop desenvolvido como parte de um desafio técnico. Ele se conecta a um **Matrix Homeserver** através do **Matrix Rust SDK**, e a integração entre Flutter e Rust é feita pelo **Flutter Rust Bridge**.
 
-A aplicação foi projetada para funcionar nas seguintes plataformas:
+| Tecnologia | Versão |
+| --- | --- |
+| Flutter / Dart | 3.41.6 / 3.11.4 |
+| Rust | 1.99.0 (stable) |
+| Flutter Rust Bridge | 2.13.0 |
+| Matrix Rust SDK | 0.19.1 |
+| Riverpod / go_router | 3.3 / 17.5 |
 
-* Windows
-* macOS
-* Linux
+## Plataformas suportadas
 
-O cliente se comunica com um **Matrix Homeserver** utilizando o **Matrix Rust SDK**, com a integração entre Flutter e Rust realizada através do **Flutter Rust Bridge**.
+| Plataforma | Status |
+| --- | --- |
+| Windows 10/11 (x64) | Suportada (plataforma principal de desenvolvimento) |
+| macOS | Configurada; requer permissão de rede nas entitlements ([detalhes](docs/limitacoes.md#macos-sem-permissão-de-rede-de-saída)) |
+| Linux (x64) | Configurada; requer `libgtk-3-dev` e `libsecret-1-dev` |
 
-## Arquitetura
+Android, iOS e Web estão fora do escopo.
 
-A comunicação principal da aplicação segue o fluxo:
+## Download (Windows)
 
-```text
-Flutter
-   │
-   ├── View
-   ├── ViewModel
-   ├── Use Case
-   └── Repository
-          │
-          ▼
-Flutter Rust Bridge
-          │
-          ▼
-        Rust
-          │
-          ▼
-  Matrix Rust SDK
-          │
-          ▼
-  Matrix Homeserver
-```
+Para testar sem configurar o ambiente de desenvolvimento, baixe a versão mais recente em [Releases](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/releases):
 
-A camada de apresentação utiliza **MVVM**, mantendo a interface desacoplada da implementação de comunicação com o Matrix.
+* **`nexa-messaging-<versão>-windows-x64-setup.exe`**: instalador. Não exige administrador e inclui atalho no Menu Iniciar e desinstalador.
+* **`nexa-messaging-<versão>-windows-x64.zip`**: versão portátil. Basta extrair e executar `nexa_messaging_desktop.exe`.
 
-## Requisitos
+Requer Windows 10/11 x64 e uma [conta Matrix](#conta-matrix). Se ainda não tiver uma, crie em [matrix.org/try-matrix](https://matrix.org/try-matrix/). O executável não é assinado, então o SmartScreen pode exibir um aviso: clique em **Mais informações → Executar assim mesmo**. Detalhes e instruções para gerar os pacotes estão em [Distribuição para Windows](docs/distribuicao-windows.md).
 
-Para executar o projeto, serão necessárias as seguintes ferramentas:
+## Início rápido
 
-* Flutter
-* Dart
-* Git
-* Rust
-* Cargo
-
-> A configuração do ambiente Rust será detalhada neste README após a integração do Rust ao projeto.
-
-### Versão do Flutter
-
-O projeto está sendo desenvolvido utilizando:
-
-```text
-Flutter 3.41.6
-Dart 3.11.4
-DevTools 2.54.2
-Canal: stable
-```
-
-Versão do Flutter:
-
-```text
-db50e20168
-```
-
-### Verificar a instalação do Flutter
-
-Execute:
-
-```bash
-flutter --version
-```
-
-E:
-
-```bash
-flutter doctor
-```
-
-O `flutter doctor` deve indicar que as dependências necessárias para desenvolvimento desktop estão corretamente configuradas.
-
-## Configuração do projeto
-
-Clone o repositório:
+Pré-requisitos: Flutter 3.41+, Rust stable, CMake e o toolchain C/C++ da plataforma. A lista completa por sistema operacional está em [Configuração do ambiente](docs/configuracao-ambiente.md).
 
 ```bash
 git clone https://github.com/Maurycio-Kemesson/nexa_messaging_desktop.git
-```
-
-Entre no diretório:
-
-```bash
 cd nexa_messaging_desktop
-```
-
-Instale as dependências do Flutter:
-
-```bash
 flutter pub get
+
+flutter run -d windows   # ou: -d macos | -d linux
 ```
 
-Verifique os dispositivos desktop disponíveis:
+O Rust é compilado automaticamente durante o `flutter run` pelo Cargokit. A primeira execução demora mais por causa da compilação do `matrix-sdk`.
 
-```bash
-flutter devices
-```
+### Conta Matrix
 
-## Executando o projeto
+Para entrar no Nexa você precisa de uma conta Matrix. O Nexa é apenas o cliente e não cria contas.
 
-### Windows
+* **Já tem conta:** use o homeserver, o usuário e a senha dela.
+* **Não tem conta:** crie uma em [matrix.org/try-matrix](https://matrix.org/try-matrix/). O jeito mais simples é usar o Element Web no servidor `matrix.org`.
 
-```bash
-flutter run -d windows
-```
+A conta precisa ter **usuário e senha**. Contas criadas com login social (Google, GitHub, Apple etc.) não têm senha e não conseguem entrar pelo Nexa.
 
-### macOS
+Na tela de login, informe o homeserver (padrão `https://matrix.org`), o usuário e a senha. Veja [Configuração do Matrix](docs/configuracao-matrix.md) para preparar salas de teste e configurar o E2EE.
 
-```bash
-flutter run -d macos
-```
-
-### Linux
-
-```bash
-flutter run -d linux
-```
-
-> Para executar o projeto em cada plataforma, é necessário possuir o ambiente de desenvolvimento correspondente devidamente configurado.
-
-## Testes e análise
-
-Executar os testes:
-
-```bash
-flutter test
-```
-
-Executar a análise estática:
-
-```bash
-flutter analyze
-```
-
-Formatar o código:
-
-```bash
-dart format .
-```
-
-Antes de abrir um Pull Request, a expectativa é que os seguintes comandos sejam executados com sucesso:
+Qualidade antes de cada Pull Request:
 
 ```bash
 dart format .
@@ -164,178 +82,92 @@ flutter analyze
 flutter test
 ```
 
-## Fluxo de desenvolvimento
-
-O desenvolvimento utiliza **GitHub Issues**, branches por funcionalidade, **TDD**, Conventional Commits e Pull Requests.
-
-O fluxo principal é:
-
-```text
-GitHub Issue
-      ↓
-Feature Branch
-      ↓
-TDD
-      ↓
-Implementação
-      ↓
-Testes
-      ↓
-Pull Request
-      ↓
-develop
-```
-
-Exemplo de criação de uma branch:
+Após alterar a API Rust em `rust/src/api/`:
 
 ```bash
-git checkout develop
-git pull origin develop
-git checkout -b feature/matrix-authentication
+flutter_rust_bridge_codegen generate
 ```
 
-### Conventional Commits
-
-Os commits seguem a convenção Conventional Commits.
-
-Exemplos:
+## Arquitetura em resumo
 
 ```text
-feat: implementar autenticação Matrix
-fix: corrigir tratamento de credenciais inválidas
-test: adicionar testes de autenticação
-refactor: simplificar fluxo de autenticação
-docs: documentar arquitetura de autenticação
-chore: configurar analyzer e lints
+Flutter                                         Rust
+┌──────────────────────────────────────┐        ┌───────────────────────────┐
+│ View → ViewModel → Use Case → Repo   │  FRB   │ rust/src/api              │
+│        (Riverpod)          │         │ ─────► │   ↓                       │
+│                            ▼         │ ◄───── │ Matrix Rust SDK ─► SQLite │
+│               flutter_secure_storage │ Stream └─────────┬─────────────────┘
+└──────────────────────────────────────┘                  │ HTTPS
+                                                          ▼
+                                                  Matrix Homeserver
 ```
 
-## Arquitetura da aplicação
+* A apresentação segue **MVVM** com Use Cases e Repositories. Somente os Repositories conhecem o código gerado pelo FRB.
+* O Rust concentra toda a comunicação com o Matrix, a sincronização e a criptografia ponta a ponta.
+* Chamadas Flutter → Rust são `Future`s. Novas mensagens chegam do Rust ao Flutter por um `Stream` (`StreamSink` do FRB).
+* A sessão fica no cofre de credenciais do sistema operacional. O estado do Matrix e as chaves E2EE ficam no SQLite do SDK.
 
-A aplicação Flutter utiliza uma arquitetura baseada em **MVVM**, organizada em camadas.
+Detalhes em [Arquitetura](docs/arquitetura.md) e [Comunicação Flutter/Rust](docs/comunicacao-flutter-rust.md).
 
-```text
-View
- ↓
-ViewModel
- ↓
-Use Case
- ↓
-Repository
- ↓
-Flutter Rust Bridge
- ↓
-Matrix Rust SDK
+## Funcionalidades
+
+* Login no homeserver com usuário e senha.
+* Persistência e restauração automática da sessão.
+* Logout.
+* Listagem e seleção de salas.
+* Histórico de mensagens com paginação, incluindo salas com E2EE.
+* Envio de mensagens de texto.
+* Recebimento de mensagens em tempo real.
+* Recuperação das chaves E2EE com a Recovery Key.
+
+## Testes
+
+O projeto tem **100 testes unitários** que cobrem State, Use Case e ViewModel de todas as features (`auth`, `home`, `rooms`, `messages`, `recovery` e `rust_test`). As ViewModels são testadas com Repositories falsos injetados pelo Riverpod, então os testes não dependem do Rust nem de rede.
+
+```bash
+flutter test
 ```
 
-### View
+Estratégia, cobertura por feature e como escrever novos testes: [Testes](docs/testes.md).
 
-Responsável pela interface e interação visual com o usuário.
+## Documentação completa
 
-### ViewModel
-
-Responsável pelo estado da tela e pela coordenação das ações realizadas pelo usuário.
-
-A ViewModel não acessa diretamente o Matrix SDK.
-
-### Use Case
-
-Representa uma ação ou regra de negócio específica da aplicação.
-
-Exemplos:
-
-```text
-Login
-Logout
-Listar salas
-Buscar mensagens
-Enviar mensagem
-Restaurar sessão
-```
-
-### Repository
-
-Abstrai o acesso aos dados e impede que as camadas superiores dependam diretamente da implementação do Matrix.
-
-### Flutter Rust Bridge
-
-Responsável pela comunicação entre o código Dart/Flutter e o código Rust.
-
-### Rust
-
-Concentra a integração nativa com o **Matrix Rust SDK**.
-
-## Comunicação com o Matrix
-
-A comunicação com o Matrix segue o fluxo:
-
-```text
-Flutter
-   ↓
-Flutter Rust Bridge
-   ↓
-Rust
-   ↓
-Matrix Rust SDK
-   ↓
-Matrix Homeserver
-```
-
-Essa abordagem mantém a integração com o Matrix isolada da camada de apresentação do Flutter.
-
-## Decisões técnicas
-
-As principais decisões técnicas do projeto são documentadas utilizando **Architecture Decision Records (ADR)**.
+| Documento | Conteúdo |
+| --- | --- |
+| [Configuração do ambiente](docs/configuracao-ambiente.md) | Plataformas, versões, dependências por SO, execução, build, codegen do FRB, testes e problemas comuns. |
+| [Distribuição para Windows](docs/distribuicao-windows.md) | Instalador e versão portátil, conteúdo do pacote, geração com Inno Setup e publicação de releases. |
+| [Configuração do Matrix](docs/configuracao-matrix.md) | Homeserver, conta de teste, login, persistência, E2EE, recuperação de chaves e reset do estado local. |
+| [Arquitetura](docs/arquitetura.md) | Camadas, estrutura das features, navegação, camada Rust, fluxos principais e segurança. |
+| [Comunicação Flutter/Rust](docs/comunicacao-flutter-rust.md) | Funcionamento do FRB, funções e tipos expostos, Futures, Streams, erros e concorrência. |
+| [Testes](docs/testes.md) | Estratégia de testes unitários, cobertura por feature, fakes, Riverpod e testes Rust. |
+| [Decisões técnicas](docs/decisoes-tecnicas.md) | Resumo das decisões e índice dos ADRs. |
+| [Limitações conhecidas](docs/limitacoes.md) | O que não é suportado e melhorias sugeridas. |
+| [Gestão do projeto](docs/gestao-do-projeto.md) | Quadro do GitHub Projects, divisão das atividades em issues, fluxo de branches e commits. |
 
 ### ADRs
 
 * [ADR 001 — Lint e análise estática](docs/adr/001-lint-e-analise-estatica.md)
-
-
-> Os ADRs serão adicionados conforme as decisões técnicas forem implementadas e validadas durante o desenvolvimento.
-
-## Segurança
-
-A segurança é considerada desde a arquitetura da aplicação.
-
-Entre as medidas adotadas estão:
-
-* evitar exposição de informações sensíveis em logs;
-* isolamento da integração com o Matrix;
-* separação entre apresentação e infraestrutura;
-* tratamento explícito de erros;
-* gerenciamento adequado de subscriptions e recursos;
-* análise estática do código.
-
-As decisões específicas relacionadas à segurança serão documentadas nos respectivos ADRs.
+* [ADR 002 — Arquitetura MVVM](docs/adr/002-arquitetura-mvvm.md)
+* [ADR 003 — Mason para padronização de features](docs/adr/003-adocao-mason-para-padronizacao-de-features.md)
+* [ADR 004 — Persistência e recuperação E2EE](docs/adr/004-persistencia-e-recuperacao-e2ee.md)
 
 ## Status do projeto
 
-O projeto está sendo desenvolvido de forma incremental de acordo com os requisitos do desafio técnico.
+As atividades são acompanhadas no [quadro do GitHub Projects](https://github.com/users/Maurycio-Kemesson/projects/3). A divisão completa, com os Pull Requests de cada etapa, está em [Gestão do projeto](docs/gestao-do-projeto.md).
 
-### Implementado
-
-* [ ] [Criação do projeto Flutter Desktop](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/1)
-* [ ] [Configuração do Rust](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/2)
-* [ ] [Configuração do Flutter Rust Bridge](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/3)
-* [ ] [Integração com Matrix Rust SDK](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/4)
-* [ ] [Autenticação no Matrix Homeserver](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/5)
-* [ ] [Persistência da sessão](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/6)
-* [ ] [Restauração da sessão](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/7)
-* [ ] [Logout](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/8)
-* [ ] [Listagem de salas](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/9)
-* [ ] [Seleção de sala](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/10)
-* [ ] [Histórico de mensagens](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/11)
-* [ ] [Revisar testes dos principais fluxos](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/12)
-
-## Limitações
-
-O projeto prioriza os fluxos essenciais solicitados no desafio técnico.
-
-Funcionalidades fora do escopo inicial poderão não ser implementadas, como funcionalidades avançadas de mensageria ou recursos que não sejam necessários para demonstrar os requisitos principais.
-
-As limitações conhecidas serão registradas nesta seção conforme o desenvolvimento avançar.
+* [x] [#1 Configurar projeto Flutter Desktop](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/1)
+* [x] [#2 Configurar Rust e Flutter Rust Bridge](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/2)
+* [x] [#3 Integrar Matrix Rust SDK](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/3)
+* [x] [#4 Implementar autenticação no Matrix](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/4)
+* [x] [#5 Implementar persistência e restauração da sessão](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/5)
+* [x] [#6 Implementar listagem de salas](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/6)
+* [x] [#7 Implementar histórico de mensagens](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/7)
+* [x] [#8 Implementar envio de mensagens](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/8)
+* [x] [#9 Atualização das conversas](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/9)
+* [ ] [#10 Revisar segurança e tratamento de erros](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/10)
+* [ ] [#11 Documentar arquitetura e configuração](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/11)
+* [x] [#12 Revisar testes dos principais fluxos](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/12)
 
 ## Licença
 
-Este projeto foi desenvolvido como parte de um desafio técnico.
-
+Este projeto foi desenvolvido como parte de um desafio técnico. Veja [LICENSE](LICENSE).
