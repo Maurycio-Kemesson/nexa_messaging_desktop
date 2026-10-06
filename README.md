@@ -165,7 +165,7 @@ As atividades são acompanhadas no [quadro do GitHub Projects](https://github.co
 * [x] [#8 Implementar envio de mensagens](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/8)
 * [x] [#9 Atualização das conversas](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/9)
 * [ ] [#10 Revisar segurança e tratamento de erros](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/10)
-* [ ] [#11 Documentar arquitetura e configuração](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/11)
+* [x] [#11 Documentar arquitetura e configuração](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/11)
 * [x] [#12 Revisar testes dos principais fluxos](https://github.com/Maurycio-Kemesson/nexa_messaging_desktop/issues/12)
 
 ## Licença
